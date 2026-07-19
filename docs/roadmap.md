@@ -2,7 +2,7 @@
 
 ## Current Implementation Status
 
-As of July 16, 2026:
+As of July 19, 2026:
 
 - Phase 2 is functionally working: URL detection and local video upload both reach the result screen through the FastAPI proxy and Hugging Face runtime.
 - Phase 3A is working on physical Android with a custom development build: Android Share-to-Detect can open VigilVid and route shared URLs or video files into the preview flow.
@@ -13,17 +13,29 @@ As of July 16, 2026:
 - The Game tab calls FastAPI for randomized game clips; Expo does not fetch Hugging Face Dataset files directly.
 - The backend prefers the local unzipped seed-42 export at `vigilvid_jepa21_test_export` when present, then falls back to the public Hugging Face Dataset `farouk04/vigilvid-research`.
 - Game clip playback uses backend proxy URLs and `GAME_CLIP_TRANSCODE_MODE=auto` so phone-safe clips stream directly and risky encodings are transcoded to Android-playable MP4.
-- The Game UI hides source folders/labels, uses outcome-colored answer buttons, and puts answer/model explanation behind an optional details popup.
+- The Game UI hides source folders/labels, uses Real/Fake answer buttons,
+  temporary feedback popups, and compact duel progress for Man vs Machine.
 - Supabase `game_sessions` exists in the live project. The verification query `select * from public.game_sessions order by created_at desc limit 20;` runs successfully.
-- Current UI is a foundation, not final polish. Animation, richer transitions, and final visual pass are still planned.
+- Current UI has received the final pre-APK polish pass for clearer copy,
+  smoother layout, simplified Account/Home/Preview screens, the result gauge,
+  History breakdown, and cleaner game feedback.
 - Research dataset/evaluation planning has started in `docs/dataset-evaluation.md`; local manifest and metric scripts live under `research/`.
 - The seed-42 MintVid export completed with 999 test clips. The local playback audit passed decode for all 999 clips and identified 199 clips that need phone-safe transcoding.
-- A first static web interface exists in `web/` for consumer-facing project
-  introduction, Android download placeholder, privacy summary, and a separate
-  aggregate project stats page using the verified game-session snapshot.
+- The FastAPI backend is hosted at `https://vigilvid-api.onrender.com` and has
+  been verified for health checks, detection, preview, game clips, and
+  aggregate Insights.
+- The Android preview APK is built, installable on a physical phone, and
+  published through GitHub Releases as `VigilVid-v1.0.0.apk`.
+- The static web interface exists in `web/` for consumer-facing project
+  introduction, live Android APK download, privacy summary, Real or Fake demo,
+  and a separate aggregate `Insights` page using `GET /api/insights` with a
+  verified fallback snapshot.
 - Expo Go is no longer sufficient because native modules are in use. Use `npx expo start --dev-client` with an installed development build.
-- Current FYP demo scope prioritizes detection, history, game, evaluation evidence, and documentation. Ranked/ELO leaderboard and Insights are deferred unless explicitly brought back into scope.
-- Next implementation target is final game feedback animation polish, FYP testing evidence, deployment decision, and report documentation.
+- Current FYP demo scope prioritizes final testing evidence, screenshots, and
+  report documentation. Ranked/ELO leaderboard and the mobile Insights tab are
+  deferred unless explicitly brought back into scope.
+- Next target is collecting screenshots, APK/website verification evidence,
+  Supabase evidence, model metrics, and UAT/report material.
 
 ## Practical Vibe-Coding Workflow
 
@@ -192,36 +204,37 @@ Done when:
 
 ## Phase 8: Insights
 
-Goal: show aggregate project stats when enough real data exists.
+Goal: show aggregate Insights when enough real data exists.
 
-Status: deferred for the current FYP demo unless enough real aggregate rows are
-available.
+Status: public website Insights are implemented as an aggregate dashboard.
+The mobile app Insights tab remains deferred.
 
 Tasks:
 
 - Use aggregate Supabase metadata from signed-in saved checks, feedback, and game data.
-- Add Insights tab.
+- Add mobile Insights tab if it returns to scope.
 - Add aggregate stats endpoint.
 - Show saved-check volume, human accuracy, model-vs-user trends, and common missed patterns.
 - Ensure no personal identifiers are exposed.
 
 Done when:
 
-- Insights are visible to users.
+- Public Insights are visible to website visitors.
+- Mobile Insights are visible to users only if the mobile tab returns to scope.
 - Stats are aggregate and privacy-safe.
 
 ## Phase 9: Public Web Interface
 
-Goal: provide a public access point for the project and future APK download.
+Goal: provide a public access point for the project and Android APK download.
 
 Tasks:
 
 - Build a website matching the mobile trust/safety design system.
 - Explain what VigilVid does for normal short-video users without requiring app
   installation.
-- Add Android download area.
+- Add Android download area linked to the GitHub Release APK.
 - Add privacy policy summary.
-- Move aggregate, privacy-safe project stats to a separate stats page.
+- Move aggregate, privacy-safe stats to a separate `Insights` page.
 - Load live stats data through FastAPI `GET /api/insights`, with a local
   verified snapshot fallback for plain static preview.
 - Keep secrets and privileged database credentials out of browser code.
@@ -233,8 +246,8 @@ Done when:
 - `web/index.html` can be opened locally.
 - `web/stats.html` can be opened locally or served at `/stats`.
 - The website contains no backend secrets.
-- The download section is ready for an APK or store link.
-- Project stats are clearly labeled as an aggregate snapshot or live aggregate
+- The download section links to the published APK release.
+- Public Insights are clearly labeled as an aggregate snapshot or live aggregate
   data.
 
 ## Research Dataset And Evaluation

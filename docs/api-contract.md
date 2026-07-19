@@ -537,9 +537,9 @@ Initial persistence rules:
 
 ## GET `/api/insights`
 
-Returns aggregate anonymous stats for the public project stats page.
+Returns aggregate anonymous stats for the public website Insights page.
 
-Status: implemented for public web stats use. The mobile Insights tab is
+Status: implemented for public website Insights use. The mobile Insights tab is
 still deferred unless it explicitly returns to scope.
 
 Response:

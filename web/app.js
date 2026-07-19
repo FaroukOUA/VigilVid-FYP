@@ -44,6 +44,32 @@ const practiceNextButton = document.querySelector("[data-practice-next]");
 const practiceCount = document.querySelector("[data-practice-count]");
 const visibilityVideo = document.querySelector("[data-visibility-video]");
 
+const rewriteLocalNavigationLinks = () => {
+  if (window.location.protocol !== "file:") {
+    return;
+  }
+
+  document.querySelectorAll('a[href^="/"]').forEach((link) => {
+    if (!(link instanceof HTMLAnchorElement)) {
+      return;
+    }
+
+    const href = link.getAttribute("href");
+    if (!href) {
+      return;
+    }
+
+    if (href === "/" || href.startsWith("/#")) {
+      link.setAttribute("href", `index.html${href.slice(1)}`);
+      return;
+    }
+
+    if (href === "/stats" || href.startsWith("/stats#")) {
+      link.setAttribute("href", `stats.html${href.slice("/stats".length)}`);
+    }
+  });
+};
+
 const practiceClips = [
   {
     src: "assets/practice-real.mp4",
@@ -466,6 +492,8 @@ const closeMenu = () => {
   menuButton.setAttribute("aria-expanded", "false");
   navLinks.classList.remove("is-open");
 };
+
+rewriteLocalNavigationLinks();
 
 if (menuButton && navLinks) {
   menuButton.addEventListener("click", () => {

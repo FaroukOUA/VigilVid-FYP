@@ -6,7 +6,7 @@ VigilVid currently runs as a mobile app plus a backend proxy.
 
 ```text
 Static web interface
--> public project, download, privacy, research, and aggregate insight pages
+-> public project, APK download, privacy, research, and aggregate Insights pages
 
 Expo / React Native app
 -> FastAPI backend
@@ -26,14 +26,13 @@ opened directly or hosted as static files without adding another app framework.
 The web interface is responsible for:
 
 - introducing VigilVid to people who do not have the app installed
-- providing the future Android APK or store link
+- providing the Android APK download link
 - summarizing privacy behavior
 - linking to the public Hugging Face research dataset
-- showing aggregate, privacy-safe project stats on a separate stats page when
-  real data exists
+- showing aggregate, privacy-safe Insights on a separate dashboard page
 
 The website must not contain Supabase service-role keys, Hugging Face tokens,
-SaverAPI keys, or dataset write credentials. Live project stats data comes from
+SaverAPI keys, or dataset write credentials. Live Insights data comes from
 FastAPI `GET /api/insights`, not direct privileged browser access to Supabase.
 The backend serves `web/` at `/` for local/demo use, so the website and API can
 run from one FastAPI process.
@@ -224,17 +223,18 @@ The backend default `GAME_CLIP_LOCAL_EXPORT_ROOT` points there from
 
 ## Deployment Shape
 
-For a no-local-runtime demo:
+Current no-local-runtime demo shape:
 
 ```text
 public website
--> APK or app store link
+-> GitHub Release APK link
 
 Android app build
--> hosted FastAPI backend
+-> hosted FastAPI backend at https://vigilvid-api.onrender.com
 -> hosted Hugging Face Space
 -> hosted Supabase project
 ```
 
-The app then points `EXPO_PUBLIC_API_BASE_URL` to the hosted backend instead of
-a local LAN address.
+The released APK points `EXPO_PUBLIC_API_BASE_URL` to the hosted backend instead
+of a local LAN address. Local development can still point the app to a LAN
+backend for testing.

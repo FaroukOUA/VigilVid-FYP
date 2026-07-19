@@ -194,7 +194,7 @@ Suggested sections:
   - history
   - game modes
   - account/privacy
-  - public website homepage and separate project stats page
+  - public website homepage and separate Insights page
 - 4.7 Implementation
   - backend URL preview and upload preview
   - backend trim/window clip generation
@@ -203,7 +203,7 @@ Suggested sections:
   - game clips through backend proxy
   - auto transcoding for Android playback
   - static web interface for project access, download information, privacy
-    summary, and separate aggregate project stats charts
+    summary, and separate aggregate Insights charts
 - 4.8 Sample Code
   - include short, focused snippets only
   - good examples: FastAPI detection endpoint, Supabase persistence method,
@@ -250,16 +250,16 @@ Suggested sections:
   - sign-in/history
   - Solo score persistence
   - game clip playback and transcoding
-  - public website navigation, download placeholder, privacy summary, homepage
-    messaging, and separate aggregate project stats charts
+  - public website navigation, APK download link, privacy summary, homepage
+    messaging, and separate aggregate Insights dashboard
 - 5.4 User Acceptance Testing
   - minimum 3 testers if following the guideline note
   - include tester demographic profile in appendix
   - include UI, navigation, performance, clarity, and trust questions
 - 5.5 Deployment Discussion
   - local dev requires Expo dev client and Uvicorn backend
-  - no-local demo requires Android build, hosted FastAPI, hosted HF Space, and
-    hosted Supabase
+  - no-local demo uses the Android APK, hosted FastAPI backend, hosted HF Space,
+    and hosted Supabase
   - do not expose service-role, HF, SaverAPI, or dataset write tokens in Expo
 - 5.6 Summary
 
@@ -294,10 +294,10 @@ Suggested content:
   - model output is probabilistic, not proof
   - current classifier is binary and cannot explain artifact categories
   - analysis is limited to selected 2-minute segments
-  - hosted backend deployment is still required for no-local-runtime use
-  - ranked leaderboard and Insights are deferred in the current scope
+  - ranked leaderboard and the mobile Insights tab are deferred in the current
+    scope
 - Recommendations:
-  - add hosted deployment
+  - prepare store distribution or a stronger release channel after the APK demo
   - add stronger model evaluation and model comparison
   - add artifact-category classifier
   - add richer loading/game animations
@@ -361,17 +361,18 @@ Implemented:
 - Supabase `game_sessions` table exists and is queryable.
 - Seed-42 MintVid test export with 999 test clips and prediction/evaluation
   artifacts.
-- Static public web interface with a consumer-facing homepage, Android download
-  placeholder, privacy summary, and separate aggregate project stats page using
-  the verified game-session snapshot.
+- Hosted FastAPI backend at `https://vigilvid-api.onrender.com`.
+- Published Android APK through GitHub Releases with a SHA-256 checksum.
+- Static public web interface with a consumer-facing homepage, Android APK
+  download link, privacy summary, Real or Fake demo, and separate aggregate
+  Insights page using live `/api/insights` data with a verified fallback
+  snapshot.
 
 Deferred:
 
-- hosted production backend deployment
 - Play Store release
 - ranked/ELO leaderboard
-- public user-facing Insights dashboard
-- final Lottie/game feedback animation polish
+- mobile user-facing Insights tab
 - artifact-category explanation classifier
 
 ## Immediate Documentation Tasks
@@ -381,5 +382,5 @@ Deferred:
 3. Create architecture, ERD, and sequence diagrams.
 4. Prepare a UAT form with at least 3 testers if following the guideline.
 5. Collect backend/Expo/Supabase verification evidence.
-6. Write limitations honestly around probability, dataset bias, deployment, and
-   deferred features.
+6. Write limitations honestly around probability, dataset bias, Play Store
+   release status, and deferred features.

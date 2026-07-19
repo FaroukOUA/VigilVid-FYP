@@ -27,7 +27,7 @@ modes.
 - Supabase stores app metadata: users, history, scores, feedback, and future
   aggregate insights.
 - Public web interface covers project introduction, app download, privacy, and a
-  separate aggregate project stats page.
+  separate aggregate Insights page.
 - Current FYP demo scope defers ranked/ELO leaderboard and the user-facing
   Insights dashboard unless they are explicitly brought back into scope.
 
@@ -110,23 +110,24 @@ modes.
   database users.
 - Include project introduction, main features, Android download area, and
   privacy policy summary on the homepage.
-- Keep aggregate metrics on a separate project stats page.
+- Keep aggregate metrics on a separate public Insights page.
 - Present stats content as aggregate app metrics and charts, not as raw database
   rows.
 - Avoid public-facing terms that normal users may not know, such as Supabase or
   backend implementation details.
 - Do not expose Supabase service-role keys, Hugging Face tokens, SaverAPI keys,
   or dataset write credentials in browser code.
-- The Android APK link should be published only after the app points to a
-  hosted backend rather than a local LAN or `127.0.0.1` URL.
+- The Android APK link is published only when the app points to a hosted
+  backend rather than a local LAN or `127.0.0.1` URL.
 - Insights on the web must be aggregate and privacy-safe. Live data should come
   from FastAPI `GET /api/insights` instead of querying Supabase directly from
   public browser code.
 
 ### Insights
 
-- Deferred for the current FYP demo scope.
-- When implemented, provide a user-facing Insights tab.
+- Public website Insights are implemented as an aggregate dashboard.
+- The mobile app Insights tab is deferred for the current FYP demo scope.
+- When the mobile tab is implemented, provide a user-facing Insights tab.
 - Show aggregate anonymous research stats:
   - human accuracy trends from game data
   - AI-vs-user comparison trends
@@ -169,7 +170,6 @@ modes.
 - Solo game works locally, then persists authenticated scores.
 - Public web interface explains the app, privacy policy, and download path in
   normal user-facing language.
-- Separate public project stats page shows aggregate metrics without exposing
+- Separate public Insights page shows aggregate metrics without exposing
   user identifiers.
-- Insights dashboard is built only after real aggregate data exists and must
-  display aggregate anonymous data only.
+- Public website Insights display aggregate anonymous data only.

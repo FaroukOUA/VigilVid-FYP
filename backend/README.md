@@ -4,6 +4,14 @@ FastAPI proxy for VigilVid. The Expo app must call this backend rather than call
 
 Hugging Face tokens, ZeroGPU access, and Hugging Face Pro credentials belong only in the backend `.env`. Do not add them to Expo `EXPO_PUBLIC_*` variables.
 
+Current hosted demo backend:
+
+```text
+https://vigilvid-api.onrender.com
+```
+
+This hosted backend is the API base URL used by the published Android APK.
+
 URL preview, thumbnail strips, and backend segment trimming require `ffmpeg`
 and `ffprobe` to be installed on the backend host. The app will show a clear
 setup error if those tools are missing.
@@ -151,14 +159,15 @@ an empty `source: "not_configured"` response so the website can fall back to its
 local verified snapshot.
 
 The backend also serves the public website from `../web` at `/`, and the
-separate stats page at `/stats`, so local website testing can use one server:
+separate Insights page at `/stats`, so local website testing can use one
+server:
 
 ```powershell
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Then open `http://127.0.0.1:8000/` for the homepage,
-`http://127.0.0.1:8000/stats` for project stats, or
+`http://127.0.0.1:8000/stats` for public Insights, or
 `http://127.0.0.1:8000/api/insights` for the raw aggregate JSON.
 
 ## Research Dataset Planning

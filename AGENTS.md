@@ -13,7 +13,7 @@ Core v1 goals:
 - Provide optional accounts for history and game scores.
 - Include a Real or Fake game, Education Hub, and Privacy policy.
 - Include a public web interface for project introduction, app download,
-  privacy, and a separate aggregate project stats page.
+  privacy, and a separate aggregate Insights page.
 - Defer ranked leaderboard and user-facing Insights unless explicitly brought
   back into scope.
 - Keep detection usable without an account.

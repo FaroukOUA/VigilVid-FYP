@@ -174,6 +174,11 @@ def get_web_index() -> FileResponse:
     return get_web_file("index.html", "text/html")
 
 
+@app.get("/index.html", include_in_schema=False)
+def get_web_index_file() -> FileResponse:
+    return get_web_file("index.html", "text/html")
+
+
 @app.get("/stats", include_in_schema=False)
 def get_web_stats_shortcut() -> FileResponse:
     return get_web_file("stats.html", "text/html")

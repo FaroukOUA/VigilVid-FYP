@@ -33,6 +33,12 @@ For an APK that will be installed on a phone, set `EXPO_PUBLIC_API_BASE_URL` to
 a backend URL the phone can reach. Do not build an APK with `127.0.0.1` unless
 the backend also runs on that Android device.
 
+Current hosted demo backend:
+
+```env
+EXPO_PUBLIC_API_BASE_URL=https://vigilvid-api.onrender.com
+```
+
 Client env vars may contain public URLs only. Do not put Hugging Face tokens,
 Supabase service-role keys, or dataset credentials in the Expo app.
 
@@ -65,6 +71,18 @@ eas build --profile preview --platform android
 Before building, confirm `EXPO_PUBLIC_API_BASE_URL` points to the running
 backend you want this APK to use.
 
+Current public APK release:
+
+```text
+https://github.com/FaroukOUA/VigilVid-FYP/releases/download/v1.0.0/VigilVid-v1.0.0.apk
+```
+
+SHA-256:
+
+```text
+c64d9635fc8c1a884d3c15055547333cc9b9fd75f9949bcd35bc122aafac57ce
+```
+
 ## Current Verified Flow
 
 - URL detection reaches the result screen through the FastAPI backend.
@@ -75,6 +93,9 @@ backend you want this APK to use.
   and report issue actions.
 - Account screen can initialize a Supabase Auth session when public Supabase
   client values are configured.
+- Preview APK installs and runs on a physical Android phone when built with the
+  hosted backend URL.
+- Public website download links point to the GitHub Release APK.
 
 UI is intended to stay light, readable, and smooth. Keep future animation work
 small and focused on clear feedback.

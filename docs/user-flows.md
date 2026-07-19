@@ -206,7 +206,8 @@ Content must stay short and scannable.
 
 ## Insights Flow
 
-Status: deferred for the current FYP demo scope until real aggregate rows exist.
+Status: mobile app Insights are deferred for the current FYP demo scope. The
+public website has a separate aggregate Insights dashboard.
 
 1. User opens Insights.
 2. App loads aggregate anonymous stats.
@@ -219,31 +220,37 @@ Insights must not expose personally identifiable information.
 
 Current implementation note:
 
-- Insights are intentionally deferred until aggregate rows exist from saved detection summaries, feedback, and game data.
-- Do not ship fake Insights stats for the FYP demo; show only real aggregates or an honest empty state.
+- Mobile Insights are intentionally deferred until enough aggregate rows exist
+  from saved detection summaries, feedback, and game data.
+- The public website `stats.html` page is labeled as Insights and shows only
+  aggregate values or an honest empty/sample state.
 
 ## Public Website Flow
 
 1. Visitor opens the VigilVid website.
-2. Visitor reads a consumer-facing explanation of checking suspicious short
-   videos before sharing.
-3. Visitor can open the Android download area.
-4. If the APK is not ready, the website explains that the link is pending until
-   the public build is ready.
+2. Visitor reads a consumer-facing explanation of checking AI-generated
+   social media videos, learning detection clues, and using the Real or Fake
+   game.
+3. Visitor can download the Android APK from the website header, hero, or
+   download section.
+4. Visitor can verify the APK with the published SHA-256 checksum if needed.
 5. Visitor can read the privacy summary.
-6. Visitor can optionally open a separate project stats page with aggregate
-   metrics and charts only when those values are privacy-safe and do not expose
-   user identifiers.
+6. Visitor can open the `Insights` page from the header or footer to see
+   aggregate metrics and charts that do not expose user identifiers.
 
 Current implementation note:
 
 - The first web version is a static site in `web/`.
 - The homepage is `web/index.html`.
-- Aggregate stats are separate in `web/stats.html`.
+- Aggregate Insights are separate in `web/stats.html`.
+- In hosted use, public navigation should use `/` for the homepage and `/stats`
+  for aggregate Insights instead of linking visitors to `index.html`.
 - The stats page tries to load live aggregate JSON from FastAPI
   `GET /api/insights`.
 - If the backend is unreachable, it falls back to an aggregate game-session
   snapshot from verified Supabase rows.
+- The website download links point to the GitHub Release asset
+  `VigilVid-v1.0.0.apk`.
 - Public website copy should be written for visitors and evaluators, not as a
   deployment checklist for the developer.
 - Public homepage copy should avoid technical terms such as Supabase, database

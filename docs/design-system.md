@@ -298,7 +298,7 @@ Contrast rules:
 - Lead with the project objective: helping people check for AI-generated video,
   especially in short videos encountered on social media. Treat sharing as one
   use case, not the website's entire message.
-- Keep aggregate project stats on a separate stats page, not in the homepage
+- Keep aggregate stats on a separate public Insights page, not in the homepage
   flow.
 - Use signal animation assets or the app icon as the brand cue. Avoid relying on
   the old owl mascot image-frame loader for loading states.
@@ -350,8 +350,8 @@ Contrast rules:
   that the Education Hub teaches AI-video detection more broadly.
 - When describing result detail, use plain phrases like "moments to review" or
   "parts of the clip" instead of "time windows."
-- Web stats must show aggregate data only and should clearly distinguish a small
-  snapshot from final research findings.
+- Public Insights must show aggregate data only and should clearly distinguish
+  a small snapshot from final research findings.
 - Avoid developer-facing setup language such as build, host, publish, localhost,
   or backend configuration in public-facing website copy.
 
