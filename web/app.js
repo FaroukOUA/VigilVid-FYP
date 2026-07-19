@@ -20,6 +20,7 @@ const fallbackGameSessions = [
 const metricGrid = document.querySelector("#metricGrid");
 const sessionList = document.querySelector("#sessionList");
 const scoreChart = document.querySelector("#scoreChart");
+const resultBreakdown = document.querySelector("#resultBreakdown");
 const accuracyDonut = document.querySelector("#accuracyDonut");
 const accuracyDonutLabel = document.querySelector("#accuracyDonutLabel");
 const dashboardSource = document.querySelector("#dashboardSource");
@@ -60,6 +61,29 @@ const formatPercent = (value) => `${Math.round(value * 100)}%`;
 
 const clampProbability = (value) => Math.max(0, Math.min(1, value));
 
+const resultOrder = [
+  {
+    keys: ["real"],
+    label: "Real",
+    className: "is-real",
+  },
+  {
+    keys: ["partially_real", "partially real", "partially-real"],
+    label: "Partially real",
+    className: "is-partially-real",
+  },
+  {
+    keys: ["fake", "ai_generated", "ai-generated", "ai generated"],
+    label: "Fake",
+    className: "is-fake",
+  },
+  {
+    keys: ["partially_fake", "partially fake", "partially-fake"],
+    label: "Partially fake",
+    className: "is-partially-fake",
+  },
+];
+
 const toNumber = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -96,7 +120,48 @@ const normalizeSessions = (sessions) => {
   return sessions.map(normalizeSession).filter((session) => session.totalRounds > 0);
 };
 
-const buildDashboardData = (sessions, aggregate = {}) => {
+const normalizeResultKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+
+const normalizeCounts = (counts) => {
+  if (!counts || typeof counts !== "object") {
+    return {};
+  }
+
+  return Object.entries(counts).reduce((acc, [key, value]) => {
+    const resultKey = normalizeResultKey(key);
+    if (!resultKey) {
+      return acc;
+    }
+
+    acc[resultKey] = (acc[resultKey] || 0) + Math.max(0, Math.round(toNumber(value)));
+    return acc;
+  }, {});
+};
+
+const getResultCount = (counts, keys) =>
+  keys.reduce((total, key) => total + (counts[normalizeResultKey(key)] || 0), 0);
+
+const normalizeDetectionInsights = (detection = {}) => {
+  if (!detection || typeof detection !== "object") {
+    return {
+      detectionCount: 0,
+      averageAiProbability: 0,
+      byLabel: {},
+    };
+  }
+
+  return {
+    detectionCount: Math.max(0, Math.round(toNumber(detection.detectionCount))),
+    averageAiProbability: clampProbability(toNumber(detection.averageAiProbability)),
+    byLabel: normalizeCounts(detection.byLabel),
+  };
+};
+
+const buildDashboardData = (sessions, aggregate = {}, detection = {}) => {
   const totals = sessions.reduce(
     (acc, session) => {
       acc.score += session.score;
@@ -121,9 +186,11 @@ const buildDashboardData = (sessions, aggregate = {}) => {
   const totalCorrect = toOptionalNumber(aggregate.totalCorrect);
   const bestScore = toOptionalNumber(aggregate.bestScore);
   const bestStreak = toOptionalNumber(aggregate.bestStreak);
+  const detectionInsights = normalizeDetectionInsights(detection);
 
   return {
     sessions,
+    detection: detectionInsights,
     sessionCount: sessionCount ?? sessions.length,
     averageAccuracy: clampProbability(
       averageAccuracy ?? (totals.rounds === 0 ? 0 : totals.correct / totals.rounds),
@@ -151,18 +218,23 @@ const getApiBaseUrl = () => {
 const normalizeBackendInsights = (payload) => {
   const game = payload?.game && typeof payload.game === "object" ? payload.game : {};
   const sessions = normalizeSessions(game.recentSessions);
+  const detection =
+    payload?.detection && typeof payload.detection === "object"
+      ? payload.detection
+      : {};
 
-  let sourceMessage = "Live project stats loaded.";
+  let sourceMessage = "Current aggregate stats loaded.";
   if (payload?.source === "not_configured") {
-    sourceMessage = "Live project stats are not configured yet.";
+    sourceMessage = "Current aggregate stats are not available yet.";
   }
   if (payload?.source === "unavailable") {
-    sourceMessage = "Live project stats are temporarily unavailable.";
+    sourceMessage = "Current aggregate stats are temporarily unavailable.";
   }
 
   return {
     sessions,
     aggregate: game,
+    detection,
     sourceMessage,
   };
 };
@@ -214,36 +286,77 @@ const renderEmptyState = (container, message) => {
   container.replaceChildren(element);
 };
 
-const renderInsights = ({ sessions, aggregate, sourceMessage }) => {
+const renderResultBreakdown = (container, counts) => {
+  const rows = resultOrder.map((item) => ({
+    ...item,
+    value: getResultCount(counts, item.keys),
+  }));
+
+  const total = rows.reduce((sum, item) => sum + item.value, 0);
+  if (total === 0) {
+    renderEmptyState(container, "No saved check summaries yet.");
+    return;
+  }
+
+  const elements = rows.map((item) => {
+    const row = document.createElement("div");
+    row.className = `result-row ${item.className}`;
+
+    const label = document.createElement("span");
+    label.textContent = item.label;
+
+    const value = document.createElement("strong");
+    value.textContent = String(item.value);
+
+    row.append(label, value);
+    return row;
+  });
+
+  container.replaceChildren(...elements);
+};
+
+const renderInsights = ({ sessions, aggregate, detection, sourceMessage }) => {
   if (
     !metricGrid ||
     !sessionList ||
     !scoreChart ||
+    !resultBreakdown ||
     !accuracyDonut ||
     !accuracyDonutLabel
   ) {
     return;
   }
 
-  const insights = buildDashboardData(sessions, aggregate);
+  const insights = buildDashboardData(sessions, aggregate, detection);
   const hasSessions = insights.sessionCount > 0;
+  const hasChecks = insights.detection.detectionCount > 0;
   const metricItems = [
     {
-      label: "Game sessions",
+      label: "Saved checks",
+      value: insights.detection.detectionCount,
+      note: hasChecks
+        ? "Result summaries only; videos are not shown."
+        : "No saved check summaries yet.",
+    },
+    {
+      label: "Games played",
       value: insights.sessionCount,
       note: hasSessions
-        ? "Completed Real or Fake games included in the total."
+        ? "Completed Real or Fake games in this snapshot."
         : "No completed Real or Fake games yet.",
     },
     {
-      label: "Average accuracy",
+      label: "Game accuracy",
       value: formatPercent(insights.averageAccuracy),
-      note: `${insights.totalCorrect} correct answers from ${insights.totalRounds} rounds.`,
+      note:
+        insights.totalRounds > 0
+          ? `${insights.totalCorrect} correct answers counted.`
+          : "No game answers counted yet.",
     },
     {
-      label: "Best score",
+      label: "Highest score",
       value: insights.bestScore,
-      note: `Best streak recorded: ${insights.bestStreak}.`,
+      note: `Best streak: ${insights.bestStreak}.`,
     },
   ];
 
@@ -257,10 +370,11 @@ const renderInsights = ({ sessions, aggregate, sourceMessage }) => {
     `${Math.round(insights.averageAccuracy * 100)}%`,
   );
   accuracyDonutLabel.textContent = formatPercent(insights.averageAccuracy);
+  renderResultBreakdown(resultBreakdown, insights.detection.byLabel);
 
   if (sessions.length === 0) {
     renderEmptyState(sessionList, "No recent Real or Fake games to chart yet.");
-    renderEmptyState(scoreChart, "No score chart available yet.");
+    renderEmptyState(scoreChart, "No recent game scores yet.");
     return;
   }
 
@@ -323,6 +437,7 @@ const loadDashboard = async () => {
     !metricGrid ||
     !sessionList ||
     !scoreChart ||
+    !resultBreakdown ||
     !accuracyDonut ||
     !accuracyDonutLabel
   ) {
@@ -338,8 +453,9 @@ const loadDashboard = async () => {
   renderInsights({
     sessions: fallbackGameSessions,
     aggregate: {},
+    detection: {},
     sourceMessage:
-      "Showing sample project data while live stats are unavailable.",
+      "Showing a small sample while current aggregate stats are unavailable.",
   });
 };
 

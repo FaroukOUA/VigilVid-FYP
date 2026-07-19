@@ -6,12 +6,18 @@
     <title>VigilVid | Project stats</title>
     <meta
       name="description"
-      content="Aggregate VigilVid video-checking and Real or Fake game activity without personal identifiers."
+      content="A public aggregate snapshot of VigilVid AI-video checks and Real or Fake game activity."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&display=swap"
+      rel="stylesheet"
     />
     <link rel="icon" href="assets/favicon.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="landing-page stats-page">
     <a class="skip-link" href="#main-content">Skip to content</a>
 
     <header class="site-header">
@@ -29,45 +35,28 @@
           Menu
         </button>
         <div class="nav-links" id="site-nav">
-          <a href="index.html">Home</a>
-          <a href="index.html#download">Download</a>
+          <a href="index.html#features">Features</a>
+          <a href="index.html#practice">Game</a>
           <a href="index.html#privacy">Privacy</a>
+          <a class="nav-download" href="index.html#download">Download app</a>
         </div>
       </nav>
     </header>
 
     <main id="main-content">
-      <section class="stats-hero">
-        <div class="container stats-hero-layout">
-          <div>
-            <p class="eyebrow">Project stats</p>
-            <h1>How people are learning with VigilVid.</h1>
-            <p class="lead">
-              When live data is available, this page summarizes video checks
-              and Real or Fake game results. It never shows names, emails,
-              videos, comments, or personal records.
-            </p>
-          </div>
-          <div class="stats-privacy-note">
-            <strong>Project-wide totals only</strong>
-            <span>See overall learning trends without tracking individuals.</span>
-          </div>
-        </div>
-      </section>
-
       <section class="section dashboard-section" id="dashboard">
         <div class="container">
           <div class="section-heading inline-heading">
             <div>
-              <h2>How people are doing in the Real or Fake game.</h2>
+              <h2>Current aggregate activity.</h2>
             </div>
             <p>
-              These cards summarize completed game rounds and accuracy without
-              showing individual player records.
+              These numbers help evaluate checking, game practice, and learning
+              around AI-generated videos.
             </p>
           </div>
           <p class="dashboard-status" id="dashboardSource" aria-live="polite">
-            Loading project stats.
+            Loading aggregate stats.
           </p>
 
           <div class="metric-grid" id="metricGrid" aria-live="polite"></div>
@@ -75,8 +64,8 @@
           <div class="dashboard-grid">
             <article class="chart-card accuracy-card">
               <div>
-                <h3>Average accuracy</h3>
-                <p>Correct answers across completed game rounds.</p>
+                <h3>Average game accuracy</h3>
+                <p>Correct answers across completed Real or Fake games.</p>
               </div>
               <div
                 class="donut-chart"
@@ -91,71 +80,45 @@
             <article class="chart-card">
               <div>
                 <h3>Recent accuracy</h3>
-                <p>Each bar represents one completed game.</p>
+                <p>Recent completed games, one row each.</p>
               </div>
               <div class="session-list" id="sessionList"></div>
             </article>
 
-            <article class="chart-card wide-chart">
+            <article class="chart-card">
               <div>
-                <h3>Score comparison</h3>
-                <p>Recent game scores compared without player names.</p>
+                <h3>Checked video results</h3>
+                <p>Saved video checks grouped by VigilVid result.</p>
               </div>
-              <div class="score-chart" id="scoreChart"></div>
+              <div class="result-breakdown" id="resultBreakdown"></div>
             </article>
 
-            <article class="chart-card wide-chart">
+            <article class="chart-card">
               <div>
-                <h3>What the project can learn</h3>
-                <p>
-                  More use can reveal how people check and recognize AI video.
-                </p>
+                <h3>Recent game scores</h3>
+                <p>Scores from completed games without player names.</p>
               </div>
-              <div class="source-map">
-                <div>
-                  <strong>Checks</strong>
-                  <span>How many social media and other videos were checked</span>
-                </div>
-                <div>
-                  <strong>Reports</strong>
-                  <span>How often users disputed results</span>
-                </div>
-                <div>
-                  <strong>Game</strong>
-                  <span>Rounds, scores, and answer accuracy</span>
-                </div>
-                <div>
-                  <strong>Learning</strong>
-                  <span>AI-video clues people often miss</span>
-                </div>
-                <div>
-                  <strong>Privacy</strong>
-                  <span>Totals without personal identifiers</span>
-                </div>
-              </div>
+              <div class="score-chart" id="scoreChart"></div>
             </article>
           </div>
 
           <div class="notice-row">
             <article>
-              <h3>Small sample for now</h3>
+              <h3>Only totals</h3>
               <p>
-                Early activity is useful for testing, but it is not a final
-                research finding.
+                No names, emails, comments, or videos appear on this page.
               </p>
             </article>
             <article>
-              <h3>No personal records</h3>
+              <h3>Snapshot, not a conclusion</h3>
               <p>
-                The public website should show aggregate values only. Private
-                account records stay private.
+                Use these numbers as activity trends, not final study findings.
               </p>
             </article>
             <article>
-              <h3>More useful over time</h3>
+              <h3>Focused on AI video</h3>
               <p>
-                With more use, this page can show common AI-video mistakes,
-                game accuracy, and video-checking activity.
+                Stats connect video checks, the Real or Fake game, and learning.
               </p>
             </article>
           </div>
@@ -168,6 +131,7 @@
         <p>VigilVid</p>
         <div class="footer-links">
           <a href="index.html">Home</a>
+          <a href="index.html#download">Download app</a>
           <a href="#dashboard">Back to top</a>
         </div>
       </div>
