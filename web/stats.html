@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VigilVid | Project stats</title>
+    <meta
+      name="description"
+      content="Aggregate VigilVid video-checking and Real or Fake game activity without personal identifiers."
+    />
+    <link rel="icon" href="assets/favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <header class="site-header">
+      <nav class="nav-shell" aria-label="Main navigation">
+        <a class="brand" href="index.html" aria-label="VigilVid home">
+          <img src="assets/app-icon.png" alt="" />
+          <span>VigilVid</span>
+        </a>
+        <button
+          class="menu-button"
+          type="button"
+          aria-controls="site-nav"
+          aria-expanded="false"
+        >
+          Menu
+        </button>
+        <div class="nav-links" id="site-nav">
+          <a href="index.html">Home</a>
+          <a href="index.html#download">Download</a>
+          <a href="index.html#privacy">Privacy</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="stats-hero">
+        <div class="container stats-hero-layout">
+          <div>
+            <p class="eyebrow">Project stats</p>
+            <h1>How people are learning with VigilVid.</h1>
+            <p class="lead">
+              When live data is available, this page summarizes video checks
+              and Real or Fake game results. It never shows names, emails,
+              videos, comments, or personal records.
+            </p>
+          </div>
+          <div class="stats-privacy-note">
+            <strong>Project-wide totals only</strong>
+            <span>See overall learning trends without tracking individuals.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section dashboard-section" id="dashboard">
+        <div class="container">
+          <div class="section-heading inline-heading">
+            <div>
+              <h2>How people are doing in the Real or Fake game.</h2>
+            </div>
+            <p>
+              These cards summarize completed game rounds and accuracy without
+              showing individual player records.
+            </p>
+          </div>
+          <p class="dashboard-status" id="dashboardSource" aria-live="polite">
+            Loading project stats.
+          </p>
+
+          <div class="metric-grid" id="metricGrid" aria-live="polite"></div>
+
+          <div class="dashboard-grid">
+            <article class="chart-card accuracy-card">
+              <div>
+                <h3>Average accuracy</h3>
+                <p>Correct answers across completed game rounds.</p>
+              </div>
+              <div
+                class="donut-chart"
+                id="accuracyDonut"
+                role="img"
+                aria-label="Average Real or Fake game accuracy"
+              >
+                <span id="accuracyDonutLabel">0%</span>
+              </div>
+            </article>
+
+            <article class="chart-card">
+              <div>
+                <h3>Recent accuracy</h3>
+                <p>Each bar represents one completed game.</p>
+              </div>
+              <div class="session-list" id="sessionList"></div>
+            </article>
+
+            <article class="chart-card wide-chart">
+              <div>
+                <h3>Score comparison</h3>
+                <p>Recent game scores compared without player names.</p>
+              </div>
+              <div class="score-chart" id="scoreChart"></div>
+            </article>
+
+            <article class="chart-card wide-chart">
+              <div>
+                <h3>What the project can learn</h3>
+                <p>
+                  More use can reveal how people check and recognize AI video.
+                </p>
+              </div>
+              <div class="source-map">
+                <div>
+                  <strong>Checks</strong>
+                  <span>How many social media and other videos were checked</span>
+                </div>
+                <div>
+                  <strong>Reports</strong>
+                  <span>How often users disputed results</span>
+                </div>
+                <div>
+                  <strong>Game</strong>
+                  <span>Rounds, scores, and answer accuracy</span>
+                </div>
+                <div>
+                  <strong>Learning</strong>
+                  <span>AI-video clues people often miss</span>
+                </div>
+                <div>
+                  <strong>Privacy</strong>
+                  <span>Totals without personal identifiers</span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="notice-row">
+            <article>
+              <h3>Small sample for now</h3>
+              <p>
+                Early activity is useful for testing, but it is not a final
+                research finding.
+              </p>
+            </article>
+            <article>
+              <h3>No personal records</h3>
+              <p>
+                The public website should show aggregate values only. Private
+                account records stay private.
+              </p>
+            </article>
+            <article>
+              <h3>More useful over time</h3>
+              <p>
+                With more use, this page can show common AI-video mistakes,
+                game accuracy, and video-checking activity.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p>VigilVid</p>
+        <div class="footer-links">
+          <a href="index.html">Home</a>
+          <a href="#dashboard">Back to top</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

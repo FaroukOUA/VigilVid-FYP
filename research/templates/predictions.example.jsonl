@@ -1,0 +1,1 @@
+{"sample_id":"vv_0123456789abcdef","model_version":"hf-space-farouk04-test_scanly-2026-07","prediction_label":"fake","ai_probability":0.87,"confidence_percent":87.0,"processing_time_sec":8.2,"detection_id":"det_123","windows":[{"startSec":0.0,"endSec":6.0,"fakeProbability":0.87}]}

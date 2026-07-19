@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vigilvid.local/schema/vigilvid-research-v1.schema.json",
+  "title": "VigilVid Research Dataset Row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sample_id",
+    "split",
+    "label",
+    "label_id",
+    "local_video_path",
+    "hf_video_path",
+    "video_sha256",
+    "file_size_bytes",
+    "duration_sec",
+    "width",
+    "height",
+    "source_dataset",
+    "source_path",
+    "license",
+    "consent_scope",
+    "mime_type",
+    "created_at",
+    "model_version",
+    "prediction_label",
+    "ai_probability",
+    "confidence_percent",
+    "processing_time_sec",
+    "detection_id",
+    "windows"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vigilvid-research-v1"
+    },
+    "sample_id": {
+      "type": "string",
+      "pattern": "^vv_[a-f0-9]{16,64}$"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["train", "validation", "test", "demo"]
+    },
+    "label": {
+      "type": "string",
+      "enum": ["real", "fake"]
+    },
+    "label_id": {
+      "type": "integer",
+      "enum": [0, 1]
+    },
+    "local_video_path": {
+      "type": "string"
+    },
+    "hf_video_path": {
+      "type": ["string", "null"]
+    },
+    "video_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "file_size_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "duration_sec": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "width": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "height": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "source_dataset": {
+      "type": "string"
+    },
+    "source_path": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "consent_scope": {
+      "type": "string",
+      "enum": ["owned_dataset", "opt_in_user", "public_benchmark", "unknown"]
+    },
+    "mime_type": {
+      "type": ["string", "null"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "model_version": {
+      "type": ["string", "null"]
+    },
+    "prediction_label": {
+      "type": ["string", "null"],
+      "enum": ["real", "partially_real", "partially_fake", "fake", null]
+    },
+    "ai_probability": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "confidence_percent": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "processing_time_sec": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "detection_id": {
+      "type": ["string", "null"]
+    },
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["startSec", "endSec", "fakeProbability"],
+        "properties": {
+          "startSec": {
+            "type": "number",
+            "minimum": 0
+          },
+          "endSec": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fakeProbability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

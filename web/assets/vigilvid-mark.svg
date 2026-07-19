@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">VigilVid mark</title>
+  <desc id="desc">A shield with a video play cutout and signal dot.</desc>
+  <defs>
+    <linearGradient id="tile" x1="120" y1="80" x2="900" y2="940" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#075E58"/>
+      <stop offset="0.58" stop-color="#0E7C73"/>
+      <stop offset="1" stop-color="#22C7A9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#tile)"/>
+  <circle cx="532" cy="508" r="228" fill="none" stroke="#FFFFFF" stroke-opacity=".18" stroke-width="7"/>
+  <circle cx="532" cy="508" r="392" fill="none" stroke="#FFFFFF" stroke-opacity=".13" stroke-width="7"/>
+  <circle cx="532" cy="508" r="560" fill="none" stroke="#FFFFFF" stroke-opacity=".09" stroke-width="7"/>
+  <path d="M512 190 710 292 674 628 512 798 350 628 314 292Z" fill="#FFFFFF" fill-opacity=".96" stroke="#D8FBF3" stroke-width="13"/>
+  <rect x="438" y="364" width="242" height="278" rx="44" fill="#0E7C73" fill-opacity=".11"/>
+  <path d="M474 402v202l164-101Z" fill="#075E58"/>
+  <circle cx="676" cy="330" r="48" fill="#FFFFFF" fill-opacity=".94"/>
+  <circle cx="676" cy="330" r="27" fill="#F6B84B"/>
+</svg>

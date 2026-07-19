@@ -1,0 +1,6 @@
+fastapi==0.136.0
+gradio_client==2.4.1
+httpx==0.28.1
+python-multipart==0.0.20
+python-dotenv==1.2.1
+uvicorn[standard]==0.44.0
