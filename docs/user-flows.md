@@ -233,9 +233,8 @@ Current implementation note:
    game.
 3. Visitor can download the Android APK from the website header, hero, or
    download section.
-4. Visitor can verify the APK with the published SHA-256 checksum if needed.
-5. Visitor can read the privacy summary.
-6. Visitor can open the `Insights` page from the header or footer to see
+4. Visitor can read the privacy summary.
+5. Visitor can open the `Insights` page from the header or footer to see
    aggregate metrics and charts that do not expose user identifiers.
 
 Current implementation note:

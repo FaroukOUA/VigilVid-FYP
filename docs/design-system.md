@@ -340,6 +340,9 @@ Contrast rules:
 - A small real-or-fake practice demo may use local curated game clips with
   plain Real / Fake choices and immediate feedback.
 - Download and privacy sections should be direct and plain.
+- Do not show APK hashes, checksums, or other verification strings in the
+  end-user download section. Keep those values in README/report documentation
+  only.
 - Public copy should avoid technical terms that normal users may not know, such
   as Supabase, backend configuration, database rows, and time-window jargon.
 - Name the practice feature as the "Real or Fake game" in public website copy.

@@ -1077,17 +1077,6 @@ code {
   font-size: 0.95rem;
 }
 
-.download-checksum {
-  overflow-wrap: anywhere;
-  color: var(--ink-soft);
-}
-
-.download-checksum code {
-  display: inline;
-  padding: 2px 5px;
-  font-size: 0.82em;
-}
-
 .privacy-section {
   background: linear-gradient(180deg, var(--background), #ffffff);
 }
