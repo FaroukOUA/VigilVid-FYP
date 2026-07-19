@@ -16,7 +16,7 @@ Current pages/sections:
 - foreground homepage demo video (`assets/vigilvid-promo.mp4`)
 - framed feature screenshots (`assets/screen-*.jpeg` and
   `assets/screen-share-detect.jpg`)
-- Android app download placeholder
+- Android APK download link
 - feature overview
 - privacy policy summary
 - separate project stats page with aggregate metrics and charts
@@ -42,5 +42,5 @@ Hosting options:
 - OpenAI Sites or another hosted site platform after adding the appropriate
   project configuration
 
-Before publishing the APK link, make sure the Android app can reach the public
-VigilVid server used for detection and game clips.
+Before replacing the APK link with a future build, make sure the Android app
+can reach the public VigilVid server used for detection and game clips.
