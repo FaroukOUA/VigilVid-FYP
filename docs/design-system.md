@@ -86,15 +86,18 @@ supporting accents.
 
 ## Logo System
 
-- Primary mark: a teal/aqua signal field with a white shield, video play cutout,
-  and small mango signal dot.
+- Primary mark: a modern minimalist owl guardian on a teal/aqua signal field,
+  with a subtle magnifying glass eye cue and small mango beak/accent.
 - Use the mark for app icon, splash icon, favicon, compact navigation, and the
   Home hero brand cue.
-- Use the wordmark SVG on wider website placements when the app name should
-  appear as a single graphic.
-- Keep the logo geometric and mascot-free. Do not return to character/mascot
-  imagery for the core brand.
+- Use the app icon with adjacent live text on website headers. Use the wordmark
+  SVG only when the app name should appear as a single graphic.
+- Keep the owl geometric, friendly, and minimal. Avoid detailed animal
+  illustration, scary expressions, cartoon mascot styling, or decorative
+  clutter.
 - Source/generated assets:
+  - `VigilVid/assets/brand/vigilvid-owl-mark-source.png`
+  - `VigilVid/assets/brand/vigilvid-owl-mark.png`
   - `VigilVid/assets/brand/vigilvid-mark.svg`
   - `VigilVid/assets/brand/vigilvid-logo.svg`
   - `VigilVid/scripts/generate-logo-assets.py`
@@ -298,7 +301,7 @@ Contrast rules:
 - Keep aggregate project stats on a separate stats page, not in the homepage
   flow.
 - Use signal animation assets or the app icon as the brand cue. Avoid relying on
-  the old owl mascot image-frame loader.
+  the old owl mascot image-frame loader for loading states.
 - The website hero should lead with a real app screenshot inside a phone frame
   when available. Put text-heavy promo videos in a separate foreground demo
   section, not behind page copy.

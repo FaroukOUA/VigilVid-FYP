@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections import deque
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 APP_ROOT = PROJECT_ROOT / "VigilVid"
@@ -15,8 +16,8 @@ BACKGROUND = "#F7FBF8"
 PRIMARY = "#0E7C73"
 PRIMARY_DARK = "#075E58"
 SIGNAL_AQUA = "#22C7A9"
-ANALYSIS_BLUE = "#2563EB"
-REWARD_MANGO = "#F6B84B"
+
+SOURCE_ICON = APP_BRAND / "vigilvid-owl-mark-source.png"
 
 
 def hex_to_rgb(value: str) -> tuple[int, int, int]:
@@ -37,256 +38,160 @@ def mix(
 
 def gradient_square(size: int) -> Image.Image:
     top_left = hex_to_rgb(PRIMARY_DARK)
+    center = hex_to_rgb(PRIMARY)
     bottom_right = hex_to_rgb(SIGNAL_AQUA)
-    blue = hex_to_rgb(ANALYSIS_BLUE)
-    image = Image.new("RGB", (size, size), top_left)
+    image = Image.new("RGBA", (size, size), top_left + (255,))
     pixels = image.load()
 
     for y in range(size):
         for x in range(size):
             diagonal = (x + y) / (2 * (size - 1))
-            color = mix(top_left, bottom_right, diagonal)
-            blue_strength = max(0, 1 - ((x - size * 0.72) ** 2 + (y - size * 0.18) ** 2) ** 0.5 / (size * 0.55))
-            if blue_strength > 0:
-                color = mix(color, blue, blue_strength * 0.26)
-            pixels[x, y] = color
+            if diagonal < 0.62:
+                color = mix(top_left, center, diagonal / 0.62)
+            else:
+                color = mix(center, bottom_right, (diagonal - 0.62) / 0.38)
+            pixels[x, y] = color + (255,)
 
-    return image.convert("RGBA")
-
-
-def scaled_points(
-    points: list[tuple[float, float]],
-    scale: float,
-    offset: tuple[float, float] = (0, 0),
-) -> list[tuple[int, int]]:
-    return [
-        (round((x + offset[0]) * scale), round((y + offset[1]) * scale))
-        for x, y in points
-    ]
-
-
-def draw_logo_mark(
-    image: Image.Image,
-    *,
-    scale: float,
-    include_background_details: bool,
-    monochrome: bool = False,
-) -> None:
-    draw = ImageDraw.Draw(image, "RGBA")
-
-    if include_background_details:
-        center = (512 * scale, 508 * scale)
-        for radius, alpha in ((228, 44), (392, 34), (560, 24)):
-            draw.ellipse(
-                [
-                    center[0] - radius * scale,
-                    center[1] - radius * scale,
-                    center[0] + radius * scale,
-                    center[1] + radius * scale,
-                ],
-                outline=(255, 255, 255, alpha),
-                width=round(7 * scale),
-            )
-        draw.line(
-            [(166 * scale, 836 * scale), (858 * scale, 170 * scale)],
-            fill=(255, 255, 255, 26),
-            width=round(9 * scale),
-        )
-
-    shield = [
-        (512, 190),
-        (710, 292),
-        (674, 628),
-        (512, 798),
-        (350, 628),
-        (314, 292),
-    ]
-
-    shadow_layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow_layer, "RGBA")
-    shadow_draw.polygon(
-        scaled_points(shield, scale, (0, 18)),
-        fill=(4, 31, 35, 62 if not monochrome else 0),
-    )
-    shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(round(22 * scale)))
-    image.alpha_composite(shadow_layer)
-
-    if monochrome:
-        shield_fill = (255, 255, 255, 255)
-        outline = (255, 255, 255, 255)
-        play_fill = (0, 0, 0, 0)
-        dot_fill = (255, 255, 255, 255)
-    else:
-        shield_fill = (255, 255, 255, 246)
-        outline = (216, 251, 243, 225)
-        play_fill = hex_to_rgb(PRIMARY_DARK) + (255,)
-        dot_fill = hex_to_rgb(REWARD_MANGO) + (255,)
-
-    draw.polygon(scaled_points(shield, scale), fill=shield_fill)
-    draw.line(
-        scaled_points(shield + [shield[0]], scale),
-        fill=outline,
-        width=round(13 * scale),
-        joint="curve",
-    )
-
-    play = [(474, 402), (474, 604), (638, 503)]
-    if monochrome:
-        draw.polygon(scaled_points(play, scale), fill=(0, 0, 0, 0))
-    else:
-        draw.rounded_rectangle(
-            [
-                round(438 * scale),
-                round(364 * scale),
-                round(680 * scale),
-                round(642 * scale),
-            ],
-            radius=round(44 * scale),
-            fill=(14, 124, 115, 28),
-        )
-        draw.polygon(scaled_points(play, scale), fill=play_fill)
-
-    dot_center = (676 * scale, 330 * scale)
-    dot_radius = 48 * scale
-    draw.ellipse(
-        [
-            dot_center[0] - dot_radius,
-            dot_center[1] - dot_radius,
-            dot_center[0] + dot_radius,
-            dot_center[1] + dot_radius,
-        ],
-        fill=(255, 255, 255, 240 if not monochrome else 0),
-    )
-    dot_inner = 27 * scale
-    draw.ellipse(
-        [
-            dot_center[0] - dot_inner,
-            dot_center[1] - dot_inner,
-            dot_center[0] + dot_inner,
-            dot_center[1] + dot_inner,
-        ],
-        fill=dot_fill,
-    )
-
-
-def make_full_icon(size: int) -> Image.Image:
-    scale = size / 1024
-    image = gradient_square(size)
-    draw_logo_mark(image, scale=scale, include_background_details=True)
     return image
 
 
-def make_adaptive_background(size: int) -> Image.Image:
-    image = gradient_square(size)
-    draw = ImageDraw.Draw(image, "RGBA")
-    center = (size * 0.54, size * 0.5)
-    for radius, alpha in ((116, 36), (202, 28), (288, 20)):
-        draw.ellipse(
-            [
-                center[0] - radius,
-                center[1] - radius,
-                center[0] + radius,
-                center[1] + radius,
-            ],
-            outline=(255, 255, 255, alpha),
-            width=max(2, round(size * 0.006)),
+def is_canvas_pixel(pixel: tuple[int, int, int, int]) -> bool:
+    red, green, blue, alpha = pixel
+    return alpha > 0 and red >= 232 and green >= 232 and blue >= 232
+
+
+def get_border_canvas_mask(image: Image.Image) -> Image.Image:
+    width, height = image.size
+    pixels = image.load()
+    mask = Image.new("L", image.size, 0)
+    mask_pixels = mask.load()
+    seen = bytearray(width * height)
+    queue: deque[tuple[int, int]] = deque()
+
+    def add_seed(x: int, y: int) -> None:
+        index = y * width + x
+        if seen[index]:
+            return
+
+        seen[index] = 1
+        if is_canvas_pixel(pixels[x, y]):
+            mask_pixels[x, y] = 255
+            queue.append((x, y))
+
+    for x in range(width):
+        add_seed(x, 0)
+        add_seed(x, height - 1)
+
+    for y in range(height):
+        add_seed(0, y)
+        add_seed(width - 1, y)
+
+    while queue:
+        x, y = queue.popleft()
+        for next_x, next_y in (
+            (x - 1, y),
+            (x + 1, y),
+            (x, y - 1),
+            (x, y + 1),
+        ):
+            if next_x < 0 or next_y < 0 or next_x >= width or next_y >= height:
+                continue
+
+            index = next_y * width + next_x
+            if seen[index]:
+                continue
+
+            seen[index] = 1
+            if is_canvas_pixel(pixels[next_x, next_y]):
+                mask_pixels[next_x, next_y] = 255
+                queue.append((next_x, next_y))
+
+    return mask
+
+
+def load_clean_source() -> Image.Image:
+    if not SOURCE_ICON.exists():
+        raise FileNotFoundError(
+            f"Missing source logo image: {SOURCE_ICON}. "
+            "Save the approved owl logo PNG there before running this script."
         )
-    return image
+
+    source = Image.open(SOURCE_ICON).convert("RGBA")
+    background = Image.new("RGBA", source.size, hex_to_rgb(PRIMARY_DARK) + (255,))
+    corner_mask = get_border_canvas_mask(source).filter(ImageFilter.MaxFilter(7))
+    return Image.composite(background, source, corner_mask)
 
 
-def make_foreground(size: int, monochrome: bool = False) -> Image.Image:
-    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    scale = size / 1024
-    draw_logo_mark(
-        image,
-        scale=scale,
-        include_background_details=False,
-        monochrome=monochrome,
+def fit_icon(source: Image.Image, size: int) -> Image.Image:
+    return ImageOps.fit(
+        source,
+        (size, size),
+        method=Image.Resampling.LANCZOS,
+        centering=(0.5, 0.5),
     )
-    return image
 
 
-def save_resized(source: Image.Image, path: Path, size: int, *, rgb: bool = False) -> None:
-    resized = source.resize((size, size), Image.Resampling.LANCZOS)
+def make_monochrome(size: int) -> Image.Image:
+    icon = fit_icon(Image.open(SOURCE_ICON).convert("RGBA"), size)
+    grayscale = ImageOps.grayscale(icon)
+    mask = grayscale.point(lambda value: 255 if value >= 118 else 0)
+    mask.paste(0, mask=get_border_canvas_mask(icon))
+    result = Image.new("RGBA", icon.size, (255, 255, 255, 0))
+    result.putalpha(mask)
+    return result
+
+
+def save_image(image: Image.Image, path: Path, *, rgb: bool = False) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     if rgb:
-        background = Image.new("RGB", resized.size, hex_to_rgb(BACKGROUND))
-        if resized.mode == "RGBA":
-            background.paste(resized, mask=resized.getchannel("A"))
-        else:
-            background.paste(resized)
-        resized = background
-    resized.save(path)
+        output = Image.new("RGB", image.size, hex_to_rgb(BACKGROUND))
+        output.paste(image.convert("RGBA"), mask=image.convert("RGBA").getchannel("A"))
+    else:
+        output = image
+    output.save(path)
 
 
 def write_svg_assets() -> None:
-    mark_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+    mark_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">VigilVid mark</title>
-  <desc id="desc">A shield with a video play cutout and signal dot.</desc>
-  <defs>
-    <linearGradient id="tile" x1="120" y1="80" x2="900" y2="940" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="{PRIMARY_DARK}"/>
-      <stop offset="0.58" stop-color="{PRIMARY}"/>
-      <stop offset="1" stop-color="{SIGNAL_AQUA}"/>
-    </linearGradient>
-  </defs>
-  <rect width="1024" height="1024" fill="url(#tile)"/>
-  <circle cx="532" cy="508" r="228" fill="none" stroke="#FFFFFF" stroke-opacity=".18" stroke-width="7"/>
-  <circle cx="532" cy="508" r="392" fill="none" stroke="#FFFFFF" stroke-opacity=".13" stroke-width="7"/>
-  <circle cx="532" cy="508" r="560" fill="none" stroke="#FFFFFF" stroke-opacity=".09" stroke-width="7"/>
-  <path d="M512 190 710 292 674 628 512 798 350 628 314 292Z" fill="#FFFFFF" fill-opacity=".96" stroke="#D8FBF3" stroke-width="13"/>
-  <rect x="438" y="364" width="242" height="278" rx="44" fill="{PRIMARY}" fill-opacity=".11"/>
-  <path d="M474 402v202l164-101Z" fill="{PRIMARY_DARK}"/>
-  <circle cx="676" cy="330" r="48" fill="#FFFFFF" fill-opacity=".94"/>
-  <circle cx="676" cy="330" r="27" fill="{REWARD_MANGO}"/>
+  <desc id="desc">A minimalist owl guardian with a magnifying glass eye.</desc>
+  <image href="vigilvid-owl-mark.png" width="1024" height="1024" preserveAspectRatio="xMidYMid slice"/>
 </svg>
 """
 
     wordmark_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-labelledby="title desc">
   <title id="title">VigilVid logo</title>
-  <desc id="desc">VigilVid wordmark with shield video signal mark.</desc>
-  <defs>
-    <linearGradient id="tile" x1="14" y1="10" x2="126" y2="138" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="{PRIMARY_DARK}"/>
-      <stop offset=".62" stop-color="{PRIMARY}"/>
-      <stop offset="1" stop-color="{SIGNAL_AQUA}"/>
-    </linearGradient>
-  </defs>
-  <rect x="10" y="10" width="140" height="140" rx="34" fill="url(#tile)"/>
-  <circle cx="82" cy="80" r="34" fill="none" stroke="#FFFFFF" stroke-opacity=".18" stroke-width="3"/>
-  <path d="M80 36 112 52 106 100 80 126 54 100 48 52Z" fill="#FFFFFF" fill-opacity=".96" stroke="#D8FBF3" stroke-width="3"/>
-  <path d="M74 64v34l28-17Z" fill="{PRIMARY_DARK}"/>
-  <circle cx="108" cy="58" r="11" fill="{REWARD_MANGO}"/>
-  <text x="178" y="98" fill="{INK}" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="850" letter-spacing="-2">VigilVid</text>
+  <desc id="desc">VigilVid wordmark with owl guardian mark.</desc>
+  <image href="vigilvid-owl-mark.png" x="10" y="10" width="140" height="140" preserveAspectRatio="xMidYMid slice"/>
+  <text x="178" y="98" fill="{INK}" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="64" font-weight="850">VigilVid</text>
 </svg>
 """
 
     for directory in (APP_BRAND, WEB_ASSETS):
         directory.mkdir(parents=True, exist_ok=True)
-
-    (APP_BRAND / "vigilvid-mark.svg").write_text(mark_svg, encoding="utf-8")
-    (APP_BRAND / "vigilvid-logo.svg").write_text(wordmark_svg, encoding="utf-8")
-    (WEB_ASSETS / "vigilvid-mark.svg").write_text(mark_svg, encoding="utf-8")
-    (WEB_ASSETS / "vigilvid-logo.svg").write_text(wordmark_svg, encoding="utf-8")
+        (directory / "vigilvid-mark.svg").write_text(mark_svg, encoding="utf-8")
+        (directory / "vigilvid-logo.svg").write_text(wordmark_svg, encoding="utf-8")
 
 
 def main() -> None:
-    APP_IMAGES.mkdir(parents=True, exist_ok=True)
-    WEB_ASSETS.mkdir(parents=True, exist_ok=True)
+    source = load_clean_source()
+    app_icon = fit_icon(source, 1024)
+    adaptive_background = gradient_square(512)
+    adaptive_foreground = fit_icon(source, 512)
+    monochrome = make_monochrome(432)
 
-    icon = make_full_icon(1024)
-    adaptive_background = make_adaptive_background(512)
-    adaptive_foreground = make_foreground(512)
-    monochrome = make_foreground(432, monochrome=True)
+    save_image(app_icon, APP_BRAND / "vigilvid-owl-mark.png", rgb=True)
+    save_image(app_icon, WEB_ASSETS / "vigilvid-owl-mark.png", rgb=True)
 
-    save_resized(icon, APP_IMAGES / "icon.png", 1024, rgb=True)
-    save_resized(icon, APP_IMAGES / "favicon.png", 48)
-    save_resized(icon, APP_IMAGES / "splash-icon.png", 1024)
-    save_resized(adaptive_background, APP_IMAGES / "android-icon-background.png", 512)
-    save_resized(adaptive_foreground, APP_IMAGES / "android-icon-foreground.png", 512)
-    save_resized(monochrome, APP_IMAGES / "android-icon-monochrome.png", 432)
+    save_image(app_icon, APP_IMAGES / "icon.png", rgb=True)
+    save_image(fit_icon(source, 48), APP_IMAGES / "favicon.png")
+    save_image(app_icon, APP_IMAGES / "splash-icon.png")
+    save_image(adaptive_background, APP_IMAGES / "android-icon-background.png")
+    save_image(adaptive_foreground, APP_IMAGES / "android-icon-foreground.png")
+    save_image(monochrome, APP_IMAGES / "android-icon-monochrome.png")
 
-    save_resized(icon, WEB_ASSETS / "app-icon.png", 1024, rgb=True)
-    save_resized(icon, WEB_ASSETS / "favicon.png", 48)
+    save_image(app_icon, WEB_ASSETS / "app-icon.png", rgb=True)
+    save_image(fit_icon(source, 48), WEB_ASSETS / "favicon.png")
 
     write_svg_assets()
 
