@@ -123,10 +123,9 @@ Current implementation note:
 - The analysis-window timeline can render a placeholder strip when no video thumbnails are available.
 - URL preview detections can return a real backend-generated thumbnail strip with a continuous probability overlay from green through amber to red.
 - Local upload detections can return a backend-generated thumbnail strip when the upload is trimmed before analysis. Otherwise the result timeline may use the placeholder strip.
-- Result windows are tappable. When a backend preview exists, the popup plays a
-  temporary backend-trimmed clip containing only that selected model window.
-  Local-file fallback can still autoplay the selected range, but backend preview
-  clips are preferred because native controls cannot scrub outside the window.
+- Result windows are tappable. Completed detections prefer a temporary
+  result-window clip generated from the analyzed segment. Local-file fallback
+  can still autoplay the selected range if backend playback data is unavailable.
 
 ## Account Flow
 

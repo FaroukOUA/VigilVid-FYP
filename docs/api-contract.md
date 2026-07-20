@@ -166,6 +166,31 @@ Rules:
   cannot scrub outside that window.
 - Requires `ffmpeg`.
 
+## GET `/api/detections/{detectionId}/window-clip.mp4`
+
+Returns an exact temporary MP4 clip for one result window from the analyzed
+segment used by the completed detection job. This is the preferred result-screen
+preview endpoint because it does not rely only on the original URL/upload
+preview cache.
+
+Query:
+
+```text
+startSec=0.0
+endSec=6.0
+```
+
+Rules:
+
+- Requires a completed detection whose temporary playback segment has not
+  expired.
+- `startSec` and `endSec` are seconds within the analyzed segment returned in
+  the detection result `windows` array.
+- The backend generates Android-safe H.264/yuv420p MP4 clips on demand and
+  caches them until the temporary result playback segment expires.
+- This is temporary processing data only. It must not be persisted to Supabase
+  or Hugging Face.
+
 ## POST `/api/video-previews/upload`
 
 Uploads a local/shared video file to the backend preview cache and returns
@@ -448,11 +473,10 @@ Rules:
 - The backend serves the matching local export video when available. Otherwise,
   it downloads the public Hugging Face Dataset video on demand and caches it
   locally.
-- `GAME_CLIP_TRANSCODE_MODE=auto` is the default. It uses `ffprobe` to serve
-  phone-safe H.264/yuv420p MP4 files directly and transcodes only risky source
-  encodings to H.264/AAC MP4. This protects Android playback from unsupported
-  encodings and green-screen playback.
-- Supported transcode modes: `auto`, `always`/`true`, and `never`/`false`.
+- `GAME_CLIP_TRANSCODE_MODE=always` is the default. `auto` is also intentionally
+  conservative and prepares clips as H.264/yuv420p/AAC MP4 to protect Android
+  playback from unsupported encodings and green-screen playback.
+- Supported transcode modes: `always`/`true`, `auto`, and `never`/`false`.
 - Optional settings:
   - `GAME_CLIP_LOCAL_EXPORT_ROOT`, defaulting to `../vigilvid_jepa21_test_export`
     from the backend folder.

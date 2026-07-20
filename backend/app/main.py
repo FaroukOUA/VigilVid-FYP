@@ -45,9 +45,11 @@ from app.video_preview import (
     get_video_preview_window_clip,
     generate_thumbnail_strip,
     get_video_preview_thumbnail_path,
+    normalize_clip_range,
     normalize_trim_range,
     probe_video_metadata,
     trim_video_segment,
+    trim_video_window_clip,
 )
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -154,11 +156,14 @@ class DetectionFeedback:
 detection_jobs: dict[str, DetectionJob] = {}
 detection_jobs_by_idempotency_key: dict[str, str] = {}
 detection_thumbnail_strips: dict[str, Path] = {}
+detection_playback_segments: dict[str, tuple[Path, float]] = {}
+detection_window_clips: dict[tuple[str, int, int], Path] = {}
 detection_feedback: list[DetectionFeedback] = []
 detection_jobs_lock = Lock()
 detection_executor = ThreadPoolExecutor(
     max_workers=int(os.getenv("DETECTION_WORKERS", "2")),
 )
+RESULT_PLAYBACK_TTL_SEC = int(os.getenv("RESULT_PLAYBACK_TTL_SEC", str(45 * 60)))
 
 
 @app.get("/health")
@@ -858,6 +863,30 @@ def get_detection(detection_id: str) -> dict[str, object]:
     }
 
 
+@app.get("/api/detections/{detection_id}/window-clip.mp4")
+def get_detection_window_clip_file(
+    detection_id: str,
+    start_sec: float = Query(alias="startSec"),
+    end_sec: float = Query(alias="endSec"),
+) -> FileResponse:
+    try:
+        clip_path = get_detection_window_clip(
+            detection_id=detection_id,
+            start_sec=start_sec,
+            end_sec=end_sec,
+        )
+    except VideoPreviewError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    if not clip_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Preview clip was not found.",
+        )
+
+    return FileResponse(clip_path, media_type="video/mp4")
+
+
 @app.post("/api/detections/{detection_id}/feedback")
 def submit_detection_feedback(
     detection_id: str,
@@ -1119,6 +1148,118 @@ def persist_detection_feedback_safely(feedback: DetectionFeedback) -> None:
         )
 
 
+def get_detection_window_clip(
+    *,
+    detection_id: str,
+    start_sec: float,
+    end_sec: float,
+) -> Path:
+    cleanup_expired_detection_playback()
+
+    with detection_jobs_lock:
+        segment_record = detection_playback_segments.get(detection_id)
+
+    if segment_record is None:
+        raise VideoPreviewError(
+            "This moment preview expired. Check the video again to create a fresh result.",
+            error_code="result_preview_expired",
+            status_code=404,
+        )
+
+    segment_path, _created_at = segment_record
+    if not segment_path.exists():
+        forget_detection_playback_segment(detection_id)
+        raise VideoPreviewError(
+            "This moment preview expired. Check the video again to create a fresh result.",
+            error_code="result_preview_expired",
+            status_code=404,
+        )
+
+    metadata = probe_video_metadata(segment_path)
+    clip_start_sec, clip_end_sec = normalize_clip_range(
+        start_sec,
+        end_sec,
+        metadata.duration_sec,
+    )
+    cache_key = (
+        detection_id,
+        round(clip_start_sec * 1000),
+        round(clip_end_sec * 1000),
+    )
+
+    with detection_jobs_lock:
+        cached_clip_path = detection_window_clips.get(cache_key)
+
+    if cached_clip_path is not None and cached_clip_path.exists():
+        return cached_clip_path
+
+    clip_path = create_temp_mp4_path(f"{detection_id}_window")
+    try:
+        trim_video_window_clip(
+            source_path=segment_path,
+            target_path=clip_path,
+            start_sec=clip_start_sec,
+            duration_sec=clip_end_sec - clip_start_sec,
+        )
+    except Exception:
+        cleanup_uploaded_file(clip_path)
+        raise
+
+    with detection_jobs_lock:
+        detection_window_clips[cache_key] = clip_path
+
+    return clip_path
+
+
+def create_temp_mp4_path(prefix: str) -> Path:
+    temp_file = tempfile.NamedTemporaryFile(
+        delete=False,
+        prefix=f"{prefix}_",
+        suffix=".mp4",
+    )
+    temp_path = Path(temp_file.name)
+    temp_file.close()
+    return temp_path
+
+
+def remember_detection_playback_segment(detection_id: str, file_path: Path) -> None:
+    cleanup_expired_detection_playback()
+    with detection_jobs_lock:
+        detection_playback_segments[detection_id] = (file_path, time.monotonic())
+
+
+def forget_detection_playback_segment(detection_id: str) -> None:
+    with detection_jobs_lock:
+        segment_record = detection_playback_segments.pop(detection_id, None)
+        expired_clip_keys = [
+            cache_key
+            for cache_key in detection_window_clips
+            if cache_key[0] == detection_id
+        ]
+        expired_clip_paths = [
+            detection_window_clips.pop(cache_key)
+            for cache_key in expired_clip_keys
+        ]
+
+    if segment_record is not None:
+        cleanup_uploaded_file(segment_record[0])
+    for clip_path in expired_clip_paths:
+        cleanup_uploaded_file(clip_path)
+
+
+def cleanup_expired_detection_playback() -> None:
+    now = time.monotonic()
+    with detection_jobs_lock:
+        expired_ids = [
+            detection_id
+            for detection_id, (_segment_path, created_at) in detection_playback_segments.items()
+            if now - created_at > RESULT_PLAYBACK_TTL_SEC
+        ]
+
+    for detection_id in expired_ids:
+        forget_detection_playback_segment(detection_id)
+
+
 def fail_detection_job(detection_id: str, error_code: str, message: str) -> None:
     with detection_jobs_lock:
         job = detection_jobs.get(detection_id)
@@ -1135,9 +1276,14 @@ def cleanup_job_upload(detection_id: str) -> None:
         if job is None:
             return
         file_path = job.file_path
+        should_keep_for_playback = job.status == "completed"
         job.file_path = None
 
     if file_path is None:
+        return
+
+    if should_keep_for_playback:
+        remember_detection_playback_segment(detection_id, file_path)
         return
 
     cleanup_uploaded_file(file_path)

@@ -35,7 +35,7 @@ GAME_MANIFEST_CACHE_SEC = int(os.getenv("GAME_MANIFEST_CACHE_SEC", "300"))
 GAME_CLIP_MAX_BYTES = int(os.getenv("GAME_CLIP_MAX_BYTES", str(200 * 1024 * 1024)))
 GAME_CLIP_TRANSCODE_MODE = os.getenv(
     "GAME_CLIP_TRANSCODE_MODE",
-    os.getenv("GAME_CLIP_TRANSCODE_ENABLED", "auto"),
+    os.getenv("GAME_CLIP_TRANSCODE_ENABLED", "always"),
 ).strip().lower()
 GAME_CLIP_FFMPEG_PATH = os.getenv("GAME_CLIP_FFMPEG_PATH", "").strip()
 GAME_CLIP_FFPROBE_PATH = os.getenv("GAME_CLIP_FFPROBE_PATH", "").strip()
@@ -279,7 +279,7 @@ def should_transcode_game_clip(source_path: Path) -> bool:
     if GAME_CLIP_TRANSCODE_MODE in {"0", "false", "no", "off", "never"}:
         return False
 
-    if GAME_CLIP_TRANSCODE_MODE in {"1", "always", "true", "yes", "on"}:
+    if GAME_CLIP_TRANSCODE_MODE in {"1", "always", "true", "yes", "on", "auto"}:
         return True
 
     return not is_phone_safe_game_clip(source_path)

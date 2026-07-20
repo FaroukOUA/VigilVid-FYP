@@ -1,3 +1,4 @@
+import { useEvent } from "expo";
 import * as Haptics from "expo-haptics";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -30,7 +31,9 @@ import { SignalLoader } from "../components/signal-loader";
 import { VideoWindowTimeline } from "../components/video-window-timeline";
 import { colors, radius, spacing } from "../constants/theme";
 import {
+  ApiError,
   createDetection,
+  getDetectionWindowClipUrl,
   getDetection,
   getVideoPreviewWindowClipUrl,
 } from "../lib/api";
@@ -55,6 +58,10 @@ type AnalysisStatus = "processing" | "completed" | "failed";
 
 const initialProgressMessage = "Preparing video";
 const contentReportUrl = "https://sebenarnya.my/salur/";
+const detectionPollIntervalMs = 1000;
+const detectionMaxPollAttempts = 480;
+const detectionCreateRetryLimit = 3;
+const detectionPollTransientFailureLimit = 12;
 
 const progressStages = [
   "Prepare selected part",
@@ -125,6 +132,20 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
+function isTransientApiError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  return (
+    error.status === 0 ||
+    error.status === 408 ||
+    error.status === 425 ||
+    error.status === 429 ||
+    (error.status >= 500 && error.status <= 599)
+  );
+}
+
 function getReadableError(error: unknown) {
   return error instanceof Error
     ? error.message
@@ -145,6 +166,34 @@ function getStableRequestKey(request: DetectionCreateRequest | null) {
   }
 
   return `analysis-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+async function createDetectionWithRetry(
+  request: DetectionCreateRequest,
+  signal: AbortSignal,
+  requestKey: string,
+  accessToken: string | undefined,
+): Promise<Awaited<ReturnType<typeof createDetection>>> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < detectionCreateRetryLimit; attempt += 1) {
+    try {
+      return await createDetection(request, signal, requestKey, accessToken);
+    } catch (error) {
+      if (isAbortError(error) || !isTransientApiError(error)) {
+        throw error;
+      }
+
+      lastError = error;
+      if (attempt === detectionCreateRetryLimit - 1) {
+        break;
+      }
+
+      await wait(1200 + attempt * 900, signal);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Request failed.");
 }
 
 function getShareMessage(result: DetectionResult) {
@@ -375,6 +424,10 @@ function WindowVideoPreview({
       videoPlayer.currentTime = startSec;
     },
   );
+  const { error, status } = useEvent(player, "statusChange", {
+    error: undefined,
+    status: player.status,
+  });
 
   useEffect(() => {
     player.currentTime = startSec;
@@ -394,17 +447,33 @@ function WindowVideoPreview({
   }, [endSec, player, startSec]);
 
   return (
-    <VideoView
-      contentFit="contain"
-      nativeControls={nativeControls}
-      player={player}
-      surfaceType="textureView"
-      style={[styles.windowPreviewVideo, { height, width }]}
-    />
+    <View style={[styles.windowPreviewFrame, { height, width }]}>
+      <VideoView
+        contentFit="contain"
+        nativeControls={nativeControls}
+        player={player}
+        surfaceType="textureView"
+        style={styles.windowPreviewVideo}
+        useExoShutter={false}
+      />
+      {status === "loading" ? (
+        <View style={styles.windowPreviewOverlay}>
+          <Text style={styles.windowPreviewOverlayText}>Preparing preview...</Text>
+        </View>
+      ) : null}
+      {status === "error" ? (
+        <View style={styles.windowPreviewOverlay}>
+          <Text selectable style={styles.windowPreviewOverlayText}>
+            {error?.message || "This moment could not be played. Try again."}
+          </Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 function WindowPreviewModal({
+  detectionId,
   fallbackVideoUri,
   onClose,
   previewId,
@@ -412,6 +481,7 @@ function WindowPreviewModal({
   trimStartSec,
   videoAspectRatio,
 }: {
+  detectionId: string;
   fallbackVideoUri: string;
   onClose: () => void;
   previewId: string;
@@ -435,13 +505,24 @@ function WindowPreviewModal({
     sourceStartSec + 0.5,
     trimStartSec + selectedWindow.endSec,
   );
-  const hasPreviewClip = Boolean(previewId);
-  const videoUri = hasPreviewClip
-    ? getVideoPreviewWindowClipUrl(previewId, sourceStartSec, sourceEndSec)
+  const hasDetectionClip = Boolean(detectionId);
+  const hasPreviewClip = !hasDetectionClip && Boolean(previewId);
+  const clipDurationSec = Math.max(
+    0.5,
+    selectedWindow.endSec - selectedWindow.startSec,
+  );
+  const videoUri = hasDetectionClip
+    ? getDetectionWindowClipUrl(
+        detectionId,
+        selectedWindow.startSec,
+        selectedWindow.endSec,
+      )
+    : hasPreviewClip
+      ? getVideoPreviewWindowClipUrl(previewId, sourceStartSec, sourceEndSec)
     : fallbackVideoUri;
-  const playbackStartSec = hasPreviewClip ? 0 : sourceStartSec;
-  const playbackEndSec = hasPreviewClip
-    ? sourceEndSec - sourceStartSec
+  const playbackStartSec = hasDetectionClip || hasPreviewClip ? 0 : sourceStartSec;
+  const playbackEndSec = hasDetectionClip || hasPreviewClip
+    ? clipDurationSec
     : sourceEndSec;
 
   return (
@@ -482,7 +563,7 @@ function WindowPreviewModal({
               endSec={playbackEndSec}
               height={previewSize.height}
               key={`${videoUri}-${playbackStartSec}-${playbackEndSec}`}
-              nativeControls={hasPreviewClip}
+              nativeControls={hasDetectionClip || hasPreviewClip}
               startSec={playbackStartSec}
               uri={videoUri}
               width={previewSize.width}
@@ -692,7 +773,7 @@ export default function AnalysisScreen() {
       setElapsedSec(0);
 
       try {
-        const created = await createDetection(
+        const created = await createDetectionWithRetry(
           request,
           controller.signal,
           requestKey,
@@ -703,8 +784,34 @@ export default function AnalysisScreen() {
           return;
         }
 
-        for (let attempt = 0; attempt < 180; attempt += 1) {
-          const state = await getDetection(created.detectionId, controller.signal);
+        let transientPollFailures = 0;
+
+        for (let attempt = 0; attempt < detectionMaxPollAttempts; attempt += 1) {
+          let state;
+
+          try {
+            state = await getDetection(created.detectionId, controller.signal);
+            transientPollFailures = 0;
+          } catch (pollError) {
+            if (isAbortError(pollError)) {
+              throw pollError;
+            }
+
+            if (
+              isTransientApiError(pollError) &&
+              transientPollFailures < detectionPollTransientFailureLimit
+            ) {
+              transientPollFailures += 1;
+              setProgressMessage("Still checking video");
+              await wait(
+                Math.min(4000, detectionPollIntervalMs + transientPollFailures * 350),
+                controller.signal,
+              );
+              continue;
+            }
+
+            throw pollError;
+          }
 
           if (!isActive) {
             return;
@@ -729,10 +836,12 @@ export default function AnalysisScreen() {
           }
 
           setProgressMessage(state.progressMessage ?? initialProgressMessage);
-          await wait(900, controller.signal);
+          await wait(detectionPollIntervalMs, controller.signal);
         }
 
-        throw new Error("Detection timed out. Try again.");
+        throw new Error(
+          "Checking is taking longer than expected. Try again with a shorter part.",
+        );
       } catch (error) {
         if (!isActive || isAbortError(error)) {
           return;
@@ -959,6 +1068,7 @@ export default function AnalysisScreen() {
         ) : null}
       </ScrollView>
       <WindowPreviewModal
+        detectionId={result?.detectionId ?? ""}
         fallbackVideoUri={fallbackVideoUri}
         onClose={() => setSelectedWindow(null)}
         previewId={source.previewId}
@@ -1253,11 +1363,28 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     fontWeight: "800",
   },
-  windowPreviewVideo: {
+  windowPreviewFrame: {
     alignSelf: "center",
     backgroundColor: colors.textPrimary,
     borderRadius: radius.md,
     overflow: "hidden",
+  },
+  windowPreviewVideo: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  windowPreviewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.58)",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  windowPreviewOverlayText: {
+    color: colors.surface,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
+    textAlign: "center",
   },
   windowPreviewUnavailable: {
     backgroundColor: colors.surfaceMuted,

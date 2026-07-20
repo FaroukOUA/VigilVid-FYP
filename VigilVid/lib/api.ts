@@ -62,6 +62,21 @@ export function getVideoPreviewWindowClipUrl(
   )}/window-clip.mp4?startSec=${startParam}&endSec=${endParam}`;
 }
 
+export function getDetectionWindowClipUrl(
+  detectionId: string,
+  startSec: number,
+  endSec: number,
+) {
+  assertApiBaseUrl();
+
+  const startParam = encodeURIComponent(startSec.toFixed(3));
+  const endParam = encodeURIComponent(endSec.toFixed(3));
+
+  return `${apiBaseUrl}/api/detections/${encodeURIComponent(
+    detectionId,
+  )}/window-clip.mp4?startSec=${startParam}&endSec=${endParam}`;
+}
+
 export async function createDetection(
   request: DetectionCreateRequest,
   signal?: AbortSignal,
