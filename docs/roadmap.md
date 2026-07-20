@@ -8,13 +8,15 @@ As of July 19, 2026:
 - Phase 3A is working on physical Android with a custom development build: Android Share-to-Detect can open VigilVid and route shared URLs or video files into the preview flow.
 - Phase 4 foundation is working: result screen shows four-level verdicts, probability, duration, processing time, suspicious windows, share result, and report issue.
 - Phase 5 account/history foundation is working: signed-in users can save and view detection history through optional Supabase persistence.
-- Phase 7 Solo Mode foundation is working with backend-randomized public Hugging Face Dataset clips, bundled fallback clips, local progress tracking, and signed-in score persistence.
+- Phase 7 Solo Mode foundation is working with bundled curated clips, local
+  progress tracking, and signed-in score persistence.
 - Phase 7 Man vs Machine local flow is working with model predictions from the MintVid evaluation export.
-- The Game tab calls FastAPI for randomized game clips; Expo does not fetch Hugging Face Dataset files directly.
+- The Game tab uses the bundled curated 12-clip set for stable v1 phone playback.
+  The FastAPI randomized game clip proxy remains available for future rounds.
 - The backend prefers the local unzipped seed-42 export at `vigilvid_jepa21_test_export` when present, then falls back to the public Hugging Face Dataset `farouk04/vigilvid-research`.
-- Game clip playback uses backend proxy URLs, a quick readiness endpoint, and
-  conservative backend transcoding so clips are prepared as Android-playable MP4
-  before `VideoView` mounts them.
+- Bundled game clip playback avoids backend/Hugging Face loading during the
+  playable v1 game flow. Backend proxy playback still uses conservative
+  transcoding for future remote game rounds.
 - The Game UI hides source folders/labels, uses Real/Fake answer buttons,
   temporary feedback popups, and compact duel progress for Man vs Machine.
 - Supabase `game_sessions` exists in the live project. The verification query `select * from public.game_sessions order by created_at desc limit 20;` runs successfully.

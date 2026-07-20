@@ -123,11 +123,10 @@ Current implementation note:
 - The analysis-window timeline can render a placeholder strip when no video thumbnails are available.
 - URL preview detections can return a real backend-generated thumbnail strip with a continuous probability overlay from green through amber to red.
 - Local upload detections can return a backend-generated thumbnail strip when the upload is trimmed before analysis. Otherwise the result timeline may use the placeholder strip.
-- Result windows are tappable. Completed detections prefer a temporary
-  result-window clip generated from the analyzed segment. The app first polls a
-  readiness endpoint, then plays the MP4 only after the backend has prepared it,
-  avoiding Android socket timeouts while ffmpeg runs. Local-file fallback can
-  still autoplay the selected range if backend playback data is unavailable.
+- Result windows are tappable. The popup uses the already prepared preview video
+  or selected local video, seeks to the selected model window, and stops at the
+  window end. This keeps Android playback immediate and avoids waiting for a
+  separate backend mini-clip.
 
 ## Account Flow
 
@@ -175,8 +174,9 @@ Current implementation note:
 
 Current implementation note:
 
-- Game modes call FastAPI for randomized public Hugging Face Dataset clips and fall back to bundled local clips if loading fails.
-- The backend selects a 12-clip round from `app/game_samples.json`.
+- v1 game modes use the bundled curated 12-clip set for stable phone playback.
+- The backend game clip proxy remains available for future randomized dataset
+  rounds, but the phone build does not wait on remote game clip preparation.
 - Active mode screens use the app bar title only; they do not repeat the mode
   name inside the page.
 - The game UI shows generic clip names only; it does not show source folders or whether a clip came from a real/fake dataset folder.
