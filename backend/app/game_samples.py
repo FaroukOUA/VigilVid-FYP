@@ -43,6 +43,9 @@ GAME_CLIP_PLAYBACK_VERSION = os.getenv(
     "GAME_CLIP_PLAYBACK_VERSION",
     "android-safe-v2",
 ).strip()
+GAME_CLIP_READY_BEFORE_RESPONSE = int(
+    os.getenv("GAME_CLIP_READY_BEFORE_RESPONSE", "1"),
+)
 GAME_CLIP_CACHE_DIR = Path(tempfile.gettempdir()) / "vigilvid_game_clips"
 DEFAULT_LOCAL_EXPORT_ROOT = Path(__file__).resolve().parents[2] / "vigilvid_jepa21_test_export"
 GAME_CLIP_LOCAL_EXPORT_ROOT = os.getenv(
@@ -90,7 +93,9 @@ def get_game_round(limit: int, public_base_url: str) -> list[dict[str, object]]:
 
     round_limit = max(1, min(limit, 24))
     selected_samples = select_random_round(samples, round_limit)
-    prewarm_game_clips(selected_samples)
+    prepared_count = max(0, min(GAME_CLIP_READY_BEFORE_RESPONSE, len(selected_samples)))
+    prepare_game_clips_before_response(selected_samples[:prepared_count])
+    prewarm_game_clips(selected_samples[prepared_count:])
 
     return [
         build_game_sample_response(
@@ -183,6 +188,14 @@ def prewarm_game_clips(samples: list[GameSample]) -> None:
 
     for sample in samples:
         schedule_game_clip_preparation(sample.id)
+
+
+def prepare_game_clips_before_response(samples: list[GameSample]) -> None:
+    for sample in samples:
+        try:
+            get_game_clip_file(sample.id)
+        except GameSampleError:
+            continue
 
 
 def download_game_clip(*, cache_path: Path, remote_url: str) -> Path:

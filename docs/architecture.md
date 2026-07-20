@@ -89,10 +89,8 @@ The backend is responsible for:
 - Returning structured result JSON to the app.
 - Reading the public Hugging Face Dataset game manifest.
 - Reading the local unzipped game/evaluation export when available.
-- Returning sanitized game clip metadata and proxying game clip playback for
-  future randomized rounds.
-- Transcoding proxied game clips for Android-safe playback when the remote game
-  flow is used.
+- Returning sanitized game clip metadata and proxying game clip playback.
+- Transcoding proxied game clips for Android-safe playback.
 - Saving history, feedback, and game scores when configured.
 
 Backend secrets stay server-side only.
@@ -127,10 +125,11 @@ vigilvid_jepa21_test_export/
 This avoids repeated remote downloads while testing the Game tab. If that folder
 is missing, the backend falls back to the public Hugging Face Dataset.
 
-The v1 phone game uses bundled curated clips for immediate playback. The backend
-game clip proxy remains available for future randomized rounds and uses
-`GAME_CLIP_TRANSCODE_MODE=always` by default so proxied clips are converted to
-phone-safe H.264/yuv420p/AAC MP4 before Android playback.
+Game clip playback is proxied by FastAPI. The backend uses
+`GAME_CLIP_TRANSCODE_MODE=always` by default so clips are converted to
+phone-safe H.264/yuv420p/AAC MP4 before Android playback. To reduce first-round
+waiting, the backend prepares the first selected clip before returning the game
+round and warms the remaining selected clips in the background.
 
 The Expo app does not call Hugging Face Dataset URLs directly. If the dataset is
 made private later, only the backend should receive the required server-side

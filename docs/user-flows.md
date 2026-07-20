@@ -174,9 +174,10 @@ Current implementation note:
 
 Current implementation note:
 
-- v1 game modes use the bundled curated 12-clip set for stable phone playback.
-- The backend game clip proxy remains available for future randomized dataset
-  rounds, but the phone build does not wait on remote game clip preparation.
+- Game modes call FastAPI for randomized public Hugging Face Dataset clips.
+- The backend prepares the first selected game clip before returning the round
+  and warms the remaining selected clips in the background. The app can fall
+  back to bundled local clips only if remote game loading fails.
 - Active mode screens use the app bar title only; they do not repeat the mode
   name inside the page.
 - The game UI shows generic clip names only; it does not show source folders or whether a clip came from a real/fake dataset folder.

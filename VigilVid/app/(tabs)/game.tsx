@@ -395,6 +395,11 @@ function GameModeMenu({
           Practice deciding whether short clips are real or fake. Start with
           solo scoring or compare your judgement with VigilVid.
         </Text>
+        {gameSamples.errorMessage ? (
+          <Text selectable style={styles.errorText}>
+            {gameSamples.errorMessage}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.modeGrid}>
@@ -405,6 +410,8 @@ function GameModeMenu({
           label={
             gameSamples.status === "loading"
               ? "Loading"
+              : gameSamples.status === "remote"
+                ? "Fresh clips"
               : `${gameSamples.items.length} clips`
           }
           onPress={() => onSelectMode("solo")}

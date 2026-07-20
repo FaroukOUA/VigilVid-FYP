@@ -169,8 +169,9 @@ Rules:
 ## GET `/api/detections/{detectionId}/window-clip`
 
 Returns readiness for one result-window MP4 and starts background preparation if
-the clip is not ready yet. The mobile app should poll this endpoint and mount
-the video player only after it returns `status: "ready"`.
+the clip is not ready yet. This endpoint is available for future optimized
+window playback. The current mobile app uses the already prepared preview video
+or selected local video for immediate result-window playback.
 
 Query:
 
@@ -203,8 +204,8 @@ Rules:
 
 - Requires a completed detection whose temporary playback segment has not
   expired.
-- This endpoint returns quickly. It must not block while ExoPlayer waits for
-  ffmpeg.
+- This endpoint returns quickly. It must not block while a video player waits
+  for ffmpeg.
 - The backend also prewarms result-window clips after detection completion.
 
 ## GET `/api/detections/{detectionId}/window-clip.mp4`
@@ -533,8 +534,9 @@ Rules:
 ## GET `/api/game/clips/{clipId}/ready`
 
 Returns readiness for one game clip and starts background preparation if the
-clip is not ready yet. The Expo app should poll this before mounting
-`VideoView`, then play `videoUrl` with `useCaching: true`.
+clip is not ready yet. This endpoint is a backend helper. The current Expo app
+plays the `videoUrl` returned by `GET /api/game/clips`; the backend prepares the
+first selected clip before returning the round and prewarms the rest.
 
 Response:
 
@@ -550,6 +552,8 @@ Rules:
 
 - Returns quickly and does not stream the MP4 itself.
 - Uses the same backend-only transcoding/cache rules as the game video endpoint.
+- The current mobile app does not need to call this endpoint during normal game
+  playback.
 - `GAME_CLIP_PLAYBACK_VERSION` can be bumped when the Android-safe ffmpeg output
   recipe changes, forcing cached playable MP4 files to be regenerated.
 
