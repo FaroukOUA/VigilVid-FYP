@@ -12,9 +12,10 @@ https://vigilvid-api.onrender.com
 
 This hosted backend is the API base URL used by the published Android APK.
 
-URL preview, thumbnail strips, and backend segment trimming require `ffmpeg`
-and `ffprobe` to be installed on the backend host. The app will show a clear
-setup error if those tools are missing.
+URL preview, thumbnail strips, and backend segment trimming use FFmpeg. The
+backend requirements include a packaged FFmpeg fallback, while `ffprobe` or
+explicit tool paths remain supported when available. The app will show a clear
+setup error if no usable video tool is available.
 
 Game clips are also proxied through the backend. By default the backend
 transcodes game clips to phone-safe H.264/AAC MP4 before serving them to Expo,
@@ -58,7 +59,9 @@ GAME_CLIP_TRANSCODE_MODE=always
 GAME_CLIP_FFMPEG_PATH=
 GAME_CLIP_FFPROBE_PATH=
 GAME_CLIP_MAX_BYTES=209715200
-GAME_CLIP_PLAYBACK_VERSION=android-safe-v2
+GAME_CLIP_PLAYBACK_VERSION=android-safe-v4
+GAME_CLIP_ALLOWED_IDS=
+GAME_CLIP_BLOCKED_IDS=
 GAME_CLIP_READY_BEFORE_RESPONSE=1
 GAME_CLIP_PREWARM_WORKERS=1
 PLAYBACK_WORKERS=1
@@ -70,10 +73,13 @@ unzipped export folder instead of downloading every clip from Hugging Face.
 `GAME_CLIP_TRANSCODE_MODE=always` is the safest Android setting and prepares
 phone-safe H.264/yuv420p/AAC MP4 clips before streaming. If Uvicorn cannot find
 FFmpeg on Windows, set `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` to
-the absolute `.exe` paths. `GAME_CLIP_PLAYBACK_VERSION` forces playable game
-clip cache regeneration when the ffmpeg output recipe changes.
+the absolute `.exe` paths. If these are empty, the backend tries system PATH
+and then the packaged FFmpeg fallback. `GAME_CLIP_PLAYBACK_VERSION` forces
+playable game clip cache regeneration when the ffmpeg output recipe changes.
 `GAME_CLIP_READY_BEFORE_RESPONSE` controls how many selected clips are prepared
 before the round response is returned.
+Use `GAME_CLIP_BLOCKED_IDS` to exclude specific Hugging Face clip IDs that fail
+on a real phone. Use `GAME_CLIP_ALLOWED_IDS` for a stricter verified-only set.
 
 ## Local Setup
 

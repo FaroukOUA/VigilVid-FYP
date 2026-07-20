@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -20,6 +22,19 @@ DIRECT_DOWNLOAD_TIMEOUT_SEC = 75.0
 LOOKUP_TIMEOUT_SEC = 20.0
 PREVIEW_TTL_SEC = 30 * 60
 THUMBNAIL_FRAME_COUNT = 8
+PHONE_SAFE_VIDEO_FILTER = (
+    "scale=w='min(1280,iw)':h='min(1280,ih)':"
+    "force_original_aspect_ratio=decrease:force_divisible_by=2,"
+    "setsar=1,fps=30,format=yuv420p"
+)
+MEDIA_FFMPEG_PATH = os.getenv(
+    "FFMPEG_PATH",
+    os.getenv("GAME_CLIP_FFMPEG_PATH", ""),
+).strip()
+MEDIA_FFPROBE_PATH = os.getenv(
+    "FFPROBE_PATH",
+    os.getenv("GAME_CLIP_FFPROBE_PATH", ""),
+).strip()
 
 ALL_IN_ONE_URL = "https://saverapi.net/api/all-in-one-downloader-api"
 YOUTUBE_URL = "https://saverapi.net/api/youtube-api"
@@ -539,9 +554,13 @@ def extract_direct_video_url(payload: object) -> str | None:
 
 
 def probe_video_metadata(video_path: Path) -> VideoMetadata:
+    ffprobe_path = find_ffprobe_path()
+    if ffprobe_path is None:
+        return probe_video_metadata_with_ffmpeg(video_path)
+
     result = run_media_command(
         [
-            "ffprobe",
+            ffprobe_path,
             "-v",
             "error",
             "-print_format",
@@ -592,6 +611,51 @@ def probe_video_metadata(video_path: Path) -> VideoMetadata:
     return VideoMetadata(duration_sec=duration, width=width, height=height)
 
 
+def probe_video_metadata_with_ffmpeg(video_path: Path) -> VideoMetadata:
+    ffmpeg_path = require_ffmpeg_path()
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg_path,
+                "-hide_banner",
+                "-i",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError) as exc:
+        raise VideoPreviewError(
+            "Video details could not be read.",
+            error_code="metadata_probe_failed",
+            status_code=500,
+        ) from exc
+
+    output = f"{result.stdout}\n{result.stderr}"
+
+    duration_match = re.search(
+        r"Duration:\s*(\d{2}):(\d{2}):(\d{2}(?:\.\d+)?)",
+        output,
+    )
+    if duration_match is None:
+        raise VideoPreviewError(
+            "The video length could not be read.",
+            error_code="duration_unknown",
+        )
+
+    hours = float(duration_match.group(1))
+    minutes = float(duration_match.group(2))
+    seconds = float(duration_match.group(3))
+    duration = hours * 3600 + minutes * 60 + seconds
+
+    size_match = re.search(r"\b(\d{2,5})x(\d{2,5})\b", output)
+    width = parse_positive_int(size_match.group(1)) if size_match else None
+    height = parse_positive_int(size_match.group(2)) if size_match else None
+
+    return VideoMetadata(duration_sec=duration, width=width, height=height)
+
+
 def trim_video_segment(
     *,
     source_path: Path,
@@ -599,9 +663,10 @@ def trim_video_segment(
     start_sec: float,
     duration_sec: float,
 ) -> None:
+    ffmpeg_path = require_ffmpeg_path()
     run_media_command(
         [
-            "ffmpeg",
+            ffmpeg_path,
             "-y",
             "-hide_banner",
             "-loglevel",
@@ -636,9 +701,10 @@ def trim_video_window_clip(
     start_sec: float,
     duration_sec: float,
 ) -> None:
+    ffmpeg_path = require_ffmpeg_path()
     run_media_command(
         [
-            "ffmpeg",
+            ffmpeg_path,
             "-y",
             "-ss",
             f"{start_sec:.3f}",
@@ -651,7 +717,7 @@ def trim_video_window_clip(
             "-map",
             "0:a?",
             "-vf",
-            "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+            PHONE_SAFE_VIDEO_FILTER,
             "-c:v",
             "libx264",
             "-preset",
@@ -660,6 +726,8 @@ def trim_video_window_clip(
             "23",
             "-profile:v",
             "baseline",
+            "-pix_fmt",
+            "yuv420p",
             "-level",
             "3.1",
             "-bf",
@@ -703,9 +771,10 @@ def generate_thumbnail_strip(
     output_path = build_temp_path(f"{file_id}_{variant}_strip", ".jpg")
 
     try:
+        ffmpeg_path = require_ffmpeg_path()
         run_media_command(
             [
-                "ffmpeg",
+                ffmpeg_path,
                 "-y",
                 "-ss",
                 f"{start_sec:.3f}",
@@ -730,6 +799,46 @@ def generate_thumbnail_strip(
         return None
 
     return output_path
+
+
+def require_ffmpeg_path() -> str:
+    ffmpeg_path = find_ffmpeg_path()
+    if ffmpeg_path is None:
+        raise VideoPreviewError(
+            "Video tools are unavailable right now.",
+            error_code="media_tools_missing",
+            status_code=503,
+        )
+
+    return ffmpeg_path
+
+
+def find_ffmpeg_path() -> str | None:
+    if MEDIA_FFMPEG_PATH and Path(MEDIA_FFMPEG_PATH).exists():
+        return MEDIA_FFMPEG_PATH
+
+    return shutil.which("ffmpeg") or get_packaged_ffmpeg_path()
+
+
+def find_ffprobe_path() -> str | None:
+    if MEDIA_FFPROBE_PATH and Path(MEDIA_FFPROBE_PATH).exists():
+        return MEDIA_FFPROBE_PATH
+
+    return shutil.which("ffprobe")
+
+
+def get_packaged_ffmpeg_path() -> str | None:
+    try:
+        import imageio_ffmpeg
+    except Exception:
+        return None
+
+    try:
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+    return ffmpeg_path if ffmpeg_path and Path(ffmpeg_path).exists() else None
 
 
 def run_media_command(command: list[str], *, timeout_sec: int) -> subprocess.CompletedProcess[str]:

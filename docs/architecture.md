@@ -10,7 +10,7 @@ Static web interface
 
 Expo / React Native app
 -> FastAPI backend
--> FFmpeg / ffprobe video tools
+-> Backend FFmpeg video tools
 -> Hugging Face Space detector
 -> local MintVid seed-42 export or Hugging Face Dataset game/evaluation files
 -> Supabase Auth and database
@@ -75,7 +75,7 @@ It uses:
 - FastAPI for the API server.
 - Uvicorn to run FastAPI locally or on a server.
 - Python Gradio client to call the Hugging Face Space.
-- FFmpeg and ffprobe for video metadata, trimming, and thumbnail strips.
+- Backend FFmpeg support for video metadata, trimming, and thumbnail strips.
 - Supabase service-role access for backend-only persistence.
 
 The backend is responsible for:

@@ -21,6 +21,24 @@ GameAnswer = Literal["real", "ai"]
 GameDifficulty = Literal["Warmup", "Medium", "Hard"]
 PHONE_SAFE_CODECS = {"h264"}
 PHONE_SAFE_PIXEL_FORMATS = {"yuv420p", "yuvj420p"}
+PHONE_SAFE_VIDEO_FILTER = (
+    "scale=w='min(1280,iw)':h='min(1280,ih)':"
+    "force_original_aspect_ratio=decrease:force_divisible_by=2,"
+    "setsar=1,fps=30,format=yuv420p"
+)
+
+
+def normalize_clip_id(value: str) -> str:
+    return value.strip().lower().replace("-", "_")
+
+
+def parse_env_id_set(value: str) -> set[str]:
+    return {
+        normalize_clip_id(item)
+        for item in value.replace("\n", ",").split(",")
+        if item.strip()
+    }
+
 
 HF_GAME_DATASET_ID = os.getenv(
     "HUGGING_FACE_GAME_DATASET_ID",
@@ -41,11 +59,13 @@ GAME_CLIP_FFMPEG_PATH = os.getenv("GAME_CLIP_FFMPEG_PATH", "").strip()
 GAME_CLIP_FFPROBE_PATH = os.getenv("GAME_CLIP_FFPROBE_PATH", "").strip()
 GAME_CLIP_PLAYBACK_VERSION = os.getenv(
     "GAME_CLIP_PLAYBACK_VERSION",
-    "android-safe-v2",
+    "android-safe-v4",
 ).strip()
 GAME_CLIP_READY_BEFORE_RESPONSE = int(
     os.getenv("GAME_CLIP_READY_BEFORE_RESPONSE", "1"),
 )
+GAME_CLIP_ALLOWED_IDS = parse_env_id_set(os.getenv("GAME_CLIP_ALLOWED_IDS", ""))
+GAME_CLIP_BLOCKED_IDS = parse_env_id_set(os.getenv("GAME_CLIP_BLOCKED_IDS", ""))
 GAME_CLIP_CACHE_DIR = Path(tempfile.gettempdir()) / "vigilvid_game_clips"
 DEFAULT_LOCAL_EXPORT_ROOT = Path(__file__).resolve().parents[2] / "vigilvid_jepa21_test_export"
 GAME_CLIP_LOCAL_EXPORT_ROOT = os.getenv(
@@ -273,7 +293,7 @@ def transcode_game_clip(source_path: Path, output_path: Path) -> Path:
         "-map",
         "0:a?",
         "-vf",
-        "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+        PHONE_SAFE_VIDEO_FILTER,
         "-c:v",
         "libx264",
         "-preset",
@@ -282,6 +302,8 @@ def transcode_game_clip(source_path: Path, output_path: Path) -> Path:
         "23",
         "-profile:v",
         "baseline",
+        "-pix_fmt",
+        "yuv420p",
         "-level",
         "3.1",
         "-bf",
@@ -324,7 +346,21 @@ def find_ffmpeg_path() -> str | None:
     if GAME_CLIP_FFMPEG_PATH and Path(GAME_CLIP_FFMPEG_PATH).exists():
         return GAME_CLIP_FFMPEG_PATH
 
-    return shutil.which("ffmpeg")
+    return shutil.which("ffmpeg") or get_packaged_ffmpeg_path()
+
+
+def get_packaged_ffmpeg_path() -> str | None:
+    try:
+        import imageio_ffmpeg
+    except Exception:
+        return None
+
+    try:
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+    return ffmpeg_path if ffmpeg_path and Path(ffmpeg_path).exists() else None
 
 
 def find_ffprobe_path() -> str | None:
@@ -451,10 +487,11 @@ def get_manifest_samples() -> list[GameSample]:
             status_code=502,
         ) from exc
 
-    samples = parse_game_manifest(payload)
+    samples = filter_game_samples(parse_game_manifest(payload))
     with _manifest_lock:
         _manifest_cache = samples
         _manifest_cached_at = now
+        _clip_paths_by_id.clear()
         for sample in samples:
             _clip_paths_by_id[sample.id] = sample.video_path
 
@@ -476,6 +513,18 @@ def parse_game_manifest(payload: object) -> list[GameSample]:
             samples.append(sample)
 
     return samples
+
+
+def filter_game_samples(samples: list[GameSample]) -> list[GameSample]:
+    return [sample for sample in samples if should_include_game_sample(sample)]
+
+
+def should_include_game_sample(sample: GameSample) -> bool:
+    sample_id = normalize_clip_id(sample.id)
+    if GAME_CLIP_ALLOWED_IDS and sample_id not in GAME_CLIP_ALLOWED_IDS:
+        return False
+
+    return sample_id not in GAME_CLIP_BLOCKED_IDS
 
 
 def parse_game_manifest_item(value: object) -> GameSample | None:

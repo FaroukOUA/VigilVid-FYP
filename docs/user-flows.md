@@ -32,7 +32,9 @@ Current implementation note:
 
 - URL preview/download is backend-first. The app does not expose the downloader API key.
 - Direct video URLs are attempted first; social media URLs use the backend `SAVER_API_KEY` downloader path when configured.
-- Backend `ffmpeg`/`ffprobe` is required for URL metadata, thumbnail strips, and selected segment trimming.
+- Backend FFmpeg support is required for URL metadata, thumbnail strips, and
+  selected segment trimming. The backend can use packaged FFmpeg when system
+  tools are unavailable.
 
 Failure states:
 

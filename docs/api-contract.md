@@ -124,7 +124,8 @@ Rules:
 
 - Supports direct video URLs first, then the configured server-side downloader API.
 - Uses `SAVER_API_KEY` on the backend only. The Expo app must never receive this key.
-- Requires `ffmpeg` and `ffprobe` on the backend for metadata, thumbnails, and trimming.
+- Requires backend FFmpeg support for metadata, thumbnails, and trimming. The
+  backend can use packaged FFmpeg when system tools are unavailable.
 - URL source videos may be longer than 2 minutes for preview, but analysis must use a selected segment of 2 minutes or less.
 - The selected segment must also stay within the 100 MB analysis limit.
 - Raw downloaded URL videos are temporary backend files and must not be stored unless separate research retention is enabled later.
@@ -253,7 +254,8 @@ Response: same `VideoPreview` shape as `POST /api/video-previews`, with
 Rules:
 
 - The uploaded preview file is temporary backend processing data.
-- Requires `ffmpeg` and `ffprobe` on the backend for metadata and thumbnails.
+- Requires backend FFmpeg support for metadata and thumbnails. The backend can
+  use packaged FFmpeg when system tools are unavailable.
 - Final analysis should prefer `previewId` plus trim values so the app does not upload the file again when preview succeeds.
 - If preview creation fails, the app may fall back to multipart detection without preview thumbnails.
 
@@ -516,8 +518,9 @@ Rules:
   it downloads the public Hugging Face Dataset video on demand and caches it
   locally.
 - `GAME_CLIP_TRANSCODE_MODE=always` is the default. `auto` is also intentionally
-  conservative and prepares clips as H.264/yuv420p/AAC MP4 to protect Android
-  playback from unsupported encodings and green-screen playback.
+  conservative and prepares clips as H.264/yuv420p/AAC MP4 capped to a 1280px
+  playback box to protect Android playback from unsupported encodings and
+  green-screen playback.
 - Supported transcode modes: `always`/`true`, `auto`, and `never`/`false`.
 - Optional settings:
   - `GAME_CLIP_LOCAL_EXPORT_ROOT`, defaulting to `../vigilvid_jepa21_test_export`
@@ -525,8 +528,11 @@ Rules:
   - `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` for explicit Windows
     executable paths when PATH resolution fails.
   - `GAME_CLIP_MAX_BYTES`, defaulting to `209715200`.
-- Requires `ffmpeg` and `ffprobe` on the backend when transcoding or auto codec
-  checks are needed.
+  - `GAME_CLIP_BLOCKED_IDS`, comma-separated IDs excluded from game rounds.
+  - `GAME_CLIP_ALLOWED_IDS`, comma-separated verified IDs. When set, only these
+    IDs can appear in game rounds.
+- Requires backend FFmpeg support when transcoding is needed. `ffprobe` is used
+  for auto codec checks when available.
 - The Expo app receives only the backend URL.
 - Hugging Face tokens or dataset write credentials must never be exposed in Expo client code.
 - The endpoint is for game playback only, not user detection history.

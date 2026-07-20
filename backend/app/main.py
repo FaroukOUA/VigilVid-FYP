@@ -22,6 +22,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from dotenv import load_dotenv
 from starlette.datastructures import UploadFile
 
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
 from app.game_samples import (
     GameSampleError,
     get_game_clip_file,
@@ -56,8 +58,6 @@ from app.video_preview import (
     trim_video_segment,
     trim_video_window_clip,
 )
-
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 logger = logging.getLogger(__name__)
 WEB_DIR = Path(__file__).resolve().parents[2] / "web"

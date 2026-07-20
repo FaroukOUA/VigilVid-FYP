@@ -455,7 +455,6 @@ function WindowVideoPreview({
         contentFit="contain"
         nativeControls={nativeControls}
         player={player}
-        surfaceType="textureView"
         style={styles.windowPreviewVideo}
         useExoShutter={false}
       />

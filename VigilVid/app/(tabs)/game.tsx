@@ -779,6 +779,12 @@ function getScoreSyncDetails(
 }
 
 function ClipPreview({ item }: { item: SoloGameItem }) {
+  useEffect(() => {
+    if (__DEV__) {
+      console.info(`[VigilVid game clip] ${item.title}: ${item.id}`);
+    }
+  }, [item.id, item.title]);
+
   const player = useVideoPlayer(item.videoSource, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.muted = false;
@@ -795,7 +801,6 @@ function ClipPreview({ item }: { item: SoloGameItem }) {
         contentFit="contain"
         nativeControls
         player={player}
-        surfaceType="textureView"
         style={styles.previewVideo}
         useExoShutter={false}
       />
