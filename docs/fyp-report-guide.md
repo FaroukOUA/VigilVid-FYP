@@ -201,7 +201,7 @@ Suggested sections:
   - result aggregation from per-window probabilities
   - Supabase optional persistence
   - game clips through backend proxy
-  - auto transcoding for Android playback
+  - readiness checks and conservative transcoding for Android playback
   - static web interface for project access, download information, privacy
     summary, and separate aggregate Insights charts
 - 4.8 Sample Code
@@ -357,7 +357,7 @@ Implemented:
 - Education tab.
 - Solo Mode and Man vs Machine game flow.
 - Backend-randomized game clips from local export or public Hugging Face Dataset.
-- Backend auto transcoding for risky game video encodings.
+- Backend readiness checks and conservative transcoding for game video playback.
 - Supabase `game_sessions` table exists and is queryable.
 - Seed-42 MintVid test export with 999 test clips and prediction/evaluation
   artifacts.

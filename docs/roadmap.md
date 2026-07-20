@@ -12,8 +12,9 @@ As of July 19, 2026:
 - Phase 7 Man vs Machine local flow is working with model predictions from the MintVid evaluation export.
 - The Game tab calls FastAPI for randomized game clips; Expo does not fetch Hugging Face Dataset files directly.
 - The backend prefers the local unzipped seed-42 export at `vigilvid_jepa21_test_export` when present, then falls back to the public Hugging Face Dataset `farouk04/vigilvid-research`.
-- Game clip playback uses backend proxy URLs and conservative backend
-  transcoding so clips are prepared as Android-playable MP4 before streaming.
+- Game clip playback uses backend proxy URLs, a quick readiness endpoint, and
+  conservative backend transcoding so clips are prepared as Android-playable MP4
+  before `VideoView` mounts them.
 - The Game UI hides source folders/labels, uses Real/Fake answer buttons,
   temporary feedback popups, and compact duel progress for Man vs Machine.
 - Supabase `game_sessions` exists in the live project. The verification query `select * from public.game_sessions order by created_at desc limit 20;` runs successfully.

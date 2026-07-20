@@ -127,7 +127,9 @@ is missing, the backend falls back to the public Hugging Face Dataset.
 
 Game clip playback is always proxied by FastAPI. The backend uses
 `GAME_CLIP_TRANSCODE_MODE=always` by default so clips are converted to
-phone-safe H.264/yuv420p/AAC MP4 before Android playback.
+phone-safe H.264/yuv420p/AAC MP4 before Android playback. The mobile app polls
+a readiness endpoint before mounting a remote game clip, then uses expo-video
+native caching for the prepared MP4 URL.
 
 The Expo app does not call Hugging Face Dataset URLs directly. If the dataset is
 made private later, only the backend should receive the required server-side

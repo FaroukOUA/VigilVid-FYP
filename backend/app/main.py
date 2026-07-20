@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from typing import Literal
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +22,12 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from dotenv import load_dotenv
 from starlette.datastructures import UploadFile
 
-from app.game_samples import GameSampleError, get_game_clip_file, get_game_round
+from app.game_samples import (
+    GameSampleError,
+    get_game_clip_file,
+    get_game_clip_playback_status,
+    get_game_round,
+)
 from app.hugging_face import DetectionRuntimeError, run_hugging_face_detection
 from app.persistence import (
     get_authenticated_user_id,
@@ -158,10 +163,14 @@ detection_jobs_by_idempotency_key: dict[str, str] = {}
 detection_thumbnail_strips: dict[str, Path] = {}
 detection_playback_segments: dict[str, tuple[Path, float]] = {}
 detection_window_clips: dict[tuple[str, int, int], Path] = {}
+detection_window_clip_preparing: set[tuple[str, int, int]] = set()
 detection_feedback: list[DetectionFeedback] = []
 detection_jobs_lock = Lock()
 detection_executor = ThreadPoolExecutor(
     max_workers=int(os.getenv("DETECTION_WORKERS", "2")),
+)
+playback_executor = ThreadPoolExecutor(
+    max_workers=int(os.getenv("PLAYBACK_WORKERS", "1")),
 )
 RESULT_PLAYBACK_TTL_SEC = int(os.getenv("RESULT_PLAYBACK_TTL_SEC", str(45 * 60)))
 
@@ -884,7 +893,44 @@ def get_detection_window_clip_file(
             detail="Preview clip was not found.",
         )
 
-    return FileResponse(clip_path, media_type="video/mp4")
+    return FileResponse(
+        clip_path,
+        headers={"Cache-Control": f"private, max-age={RESULT_PLAYBACK_TTL_SEC}"},
+        media_type="video/mp4",
+    )
+
+
+@app.get("/api/detections/{detection_id}/window-clip")
+def get_detection_window_clip_readiness(
+    detection_id: str,
+    http_request: Request,
+    start_sec: float = Query(alias="startSec"),
+    end_sec: float = Query(alias="endSec"),
+) -> dict[str, object]:
+    try:
+        playback_status, _clip_path = get_detection_window_clip_state(
+            detection_id=detection_id,
+            start_sec=start_sec,
+            end_sec=end_sec,
+            should_prepare=True,
+        )
+    except VideoPreviewError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    video_url = None
+    if playback_status == "ready":
+        video_url = build_detection_window_clip_url(
+            http_request=http_request,
+            detection_id=detection_id,
+            start_sec=start_sec,
+            end_sec=end_sec,
+        )
+
+    return {
+        "status": playback_status,
+        "videoUrl": video_url,
+        "retryAfterMs": 1000,
+    }
 
 
 @app.post("/api/detections/{detection_id}/feedback")
@@ -972,7 +1018,35 @@ def get_game_clip_video(clip_id: str) -> FileResponse:
             detail="Game clip was not found.",
         )
 
-    return FileResponse(clip_path, media_type="video/mp4")
+    return FileResponse(
+        clip_path,
+        headers={"Cache-Control": "public, max-age=604800"},
+        media_type="video/mp4",
+    )
+
+
+@app.get("/api/game/clips/{clip_id}/ready")
+def get_game_clip_ready(
+    clip_id: str,
+    http_request: Request,
+) -> dict[str, object]:
+    try:
+        playback_status, _clip_path = get_game_clip_playback_status(clip_id)
+    except GameSampleError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    video_url = None
+    if playback_status == "ready":
+        video_url = (
+            f"{get_public_base_url(http_request)}/api/game/clips/"
+            f"{quote(clip_id, safe='')}/video.mp4"
+        )
+
+    return {
+        "status": playback_status,
+        "videoUrl": video_url,
+        "retryAfterMs": 1000,
+    }
 
 
 @app.post("/api/game/scores")
@@ -1098,6 +1172,10 @@ def process_detection_job(detection_id: str) -> None:
                 current_job.progress_message = "Completed"
                 current_job.result = result
 
+        if job.file_path is not None and job.file_path.exists():
+            remember_detection_playback_segment(detection_id, job.file_path)
+            prewarm_detection_window_clips(detection_id, result)
+
         persist_detection_result_safely(job, result)
     except DetectionRuntimeError as exc:
         logger.warning("Detection job failed: %s", exc.error_code)
@@ -1154,8 +1232,62 @@ def get_detection_window_clip(
     start_sec: float,
     end_sec: float,
 ) -> Path:
-    cleanup_expired_detection_playback()
+    playback_status, clip_path = get_detection_window_clip_state(
+        detection_id=detection_id,
+        start_sec=start_sec,
+        end_sec=end_sec,
+        should_prepare=True,
+    )
 
+    if playback_status != "ready" or clip_path is None:
+        raise VideoPreviewError(
+            "This moment is still preparing. Try again in a moment.",
+            error_code="result_preview_preparing",
+            status_code=425,
+        )
+
+    return clip_path
+
+
+def get_detection_window_clip_state(
+    *,
+    detection_id: str,
+    start_sec: float,
+    end_sec: float,
+    should_prepare: bool,
+) -> tuple[Literal["preparing", "ready"], Path | None]:
+    cleanup_expired_detection_playback()
+    segment_path = get_detection_playback_segment(detection_id)
+    metadata = probe_video_metadata(segment_path)
+    clip_start_sec, clip_end_sec = normalize_clip_range(
+        start_sec,
+        end_sec,
+        metadata.duration_sec,
+    )
+    cache_key = get_detection_window_cache_key(
+        detection_id=detection_id,
+        start_sec=clip_start_sec,
+        end_sec=clip_end_sec,
+    )
+
+    with detection_jobs_lock:
+        cached_clip_path = detection_window_clips.get(cache_key)
+
+    if cached_clip_path is not None and cached_clip_path.exists():
+        return "ready", cached_clip_path
+
+    if should_prepare:
+        schedule_detection_window_clip_preparation(
+            cache_key=cache_key,
+            source_path=segment_path,
+            start_sec=clip_start_sec,
+            end_sec=clip_end_sec,
+        )
+
+    return "preparing", None
+
+
+def get_detection_playback_segment(detection_id: str) -> Path:
     with detection_jobs_lock:
         segment_record = detection_playback_segments.get(detection_id)
 
@@ -1175,40 +1307,118 @@ def get_detection_window_clip(
             status_code=404,
         )
 
-    metadata = probe_video_metadata(segment_path)
-    clip_start_sec, clip_end_sec = normalize_clip_range(
+    return segment_path
+
+
+def get_detection_window_cache_key(
+    *,
+    detection_id: str,
+    start_sec: float,
+    end_sec: float,
+) -> tuple[str, int, int]:
+    return (
+        detection_id,
+        round(start_sec * 1000),
+        round(end_sec * 1000),
+    )
+
+
+def schedule_detection_window_clip_preparation(
+    *,
+    cache_key: tuple[str, int, int],
+    source_path: Path,
+    start_sec: float,
+    end_sec: float,
+) -> None:
+    with detection_jobs_lock:
+        if cache_key in detection_window_clip_preparing:
+            return
+        cached_clip_path = detection_window_clips.get(cache_key)
+        if cached_clip_path is not None and cached_clip_path.exists():
+            return
+        detection_window_clip_preparing.add(cache_key)
+
+    playback_executor.submit(
+        prepare_detection_window_clip,
+        cache_key,
+        source_path,
         start_sec,
         end_sec,
-        metadata.duration_sec,
-    )
-    cache_key = (
-        detection_id,
-        round(clip_start_sec * 1000),
-        round(clip_end_sec * 1000),
     )
 
-    with detection_jobs_lock:
-        cached_clip_path = detection_window_clips.get(cache_key)
 
-    if cached_clip_path is not None and cached_clip_path.exists():
-        return cached_clip_path
+def prepare_detection_window_clip(
+    cache_key: tuple[str, int, int],
+    source_path: Path,
+    start_sec: float,
+    end_sec: float,
+) -> None:
+    clip_path = create_temp_mp4_path(f"{cache_key[0]}_window")
+    should_keep_clip = False
 
-    clip_path = create_temp_mp4_path(f"{detection_id}_window")
     try:
         trim_video_window_clip(
-            source_path=segment_path,
+            source_path=source_path,
             target_path=clip_path,
-            start_sec=clip_start_sec,
-            duration_sec=clip_end_sec - clip_start_sec,
+            start_sec=start_sec,
+            duration_sec=end_sec - start_sec,
         )
+        with detection_jobs_lock:
+            if cache_key[0] in detection_playback_segments:
+                detection_window_clips[cache_key] = clip_path
+                should_keep_clip = True
     except Exception:
-        cleanup_uploaded_file(clip_path)
-        raise
+        logger.exception("Could not prepare result window preview")
+    finally:
+        with detection_jobs_lock:
+            detection_window_clip_preparing.discard(cache_key)
 
-    with detection_jobs_lock:
-        detection_window_clips[cache_key] = clip_path
+        if not should_keep_clip:
+            cleanup_uploaded_file(clip_path)
 
-    return clip_path
+
+def prewarm_detection_window_clips(
+    detection_id: str,
+    result: dict[str, object],
+) -> None:
+    windows = result.get("windows")
+    if not isinstance(windows, list):
+        return
+
+    for window in windows:
+        if not isinstance(window, dict):
+            continue
+
+        start_sec = to_optional_float(window.get("startSec"))
+        end_sec = to_optional_float(window.get("endSec"))
+        if start_sec is None or end_sec is None:
+            continue
+
+        try:
+            get_detection_window_clip_state(
+                detection_id=detection_id,
+                start_sec=start_sec,
+                end_sec=end_sec,
+                should_prepare=True,
+            )
+        except VideoPreviewError:
+            continue
+
+
+def build_detection_window_clip_url(
+    *,
+    http_request: Request,
+    detection_id: str,
+    start_sec: float,
+    end_sec: float,
+) -> str:
+    start_param = quote(f"{start_sec:.3f}", safe="")
+    end_param = quote(f"{end_sec:.3f}", safe="")
+    return (
+        f"{get_public_base_url(http_request)}/api/detections/"
+        f"{quote(detection_id, safe='')}/window-clip.mp4"
+        f"?startSec={start_param}&endSec={end_param}"
+    )
 
 
 def create_temp_mp4_path(prefix: str) -> Path:
@@ -1240,6 +1450,9 @@ def forget_detection_playback_segment(detection_id: str) -> None:
             detection_window_clips.pop(cache_key)
             for cache_key in expired_clip_keys
         ]
+        for cache_key in list(detection_window_clip_preparing):
+            if cache_key[0] == detection_id:
+                detection_window_clip_preparing.discard(cache_key)
 
     if segment_record is not None:
         cleanup_uploaded_file(segment_record[0])

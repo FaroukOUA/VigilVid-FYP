@@ -33,7 +33,7 @@ import { colors, radius, spacing } from "../constants/theme";
 import {
   ApiError,
   createDetection,
-  getDetectionWindowClipUrl,
+  getDetectionWindowClipStatus,
   getDetection,
   getVideoPreviewWindowClipUrl,
 } from "../lib/api";
@@ -418,7 +418,11 @@ function WindowVideoPreview({
   width: number;
 }) {
   const player = useVideoPlayer(
-    { contentType: "progressive", uri },
+    {
+      contentType: "progressive",
+      uri,
+      useCaching: uri.startsWith("http"),
+    },
     (videoPlayer) => {
       videoPlayer.loop = false;
       videoPlayer.currentTime = startSec;
@@ -490,6 +494,75 @@ function WindowPreviewModal({
   videoAspectRatio: number;
 }) {
   const windowDimensions = useWindowDimensions();
+  const [detectionClipFailed, setDetectionClipFailed] = useState(false);
+  const [detectionClipUri, setDetectionClipUri] = useState("");
+  const [isDetectionClipPreparing, setIsDetectionClipPreparing] =
+    useState(false);
+
+  const selectedWindowStartSec = selectedWindow?.startSec ?? 0;
+  const selectedWindowEndSec = selectedWindow?.endSec ?? 0;
+
+  useEffect(() => {
+    setDetectionClipFailed(false);
+    setDetectionClipUri("");
+    setIsDetectionClipPreparing(false);
+
+    if (!selectedWindow || !detectionId) {
+      return undefined;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function prepareDetectionClip() {
+      setIsDetectionClipPreparing(true);
+
+      try {
+        for (let attempt = 0; attempt < 45; attempt += 1) {
+          const clipStatus = await getDetectionWindowClipStatus(
+            detectionId,
+            selectedWindowStartSec,
+            selectedWindowEndSec,
+            controller.signal,
+          );
+
+          if (!isActive) {
+            return;
+          }
+
+          if (clipStatus.status === "ready" && clipStatus.videoUrl) {
+            setDetectionClipUri(clipStatus.videoUrl);
+            setIsDetectionClipPreparing(false);
+            return;
+          }
+
+          await wait(
+            Math.max(500, Math.min(2500, clipStatus.retryAfterMs ?? 1000)),
+            controller.signal,
+          );
+        }
+
+        if (isActive) {
+          setDetectionClipFailed(true);
+          setIsDetectionClipPreparing(false);
+        }
+      } catch (error) {
+        if (!isActive || isAbortError(error)) {
+          return;
+        }
+
+        setDetectionClipFailed(true);
+        setIsDetectionClipPreparing(false);
+      }
+    }
+
+    void prepareDetectionClip();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [detectionId, selectedWindow, selectedWindowEndSec, selectedWindowStartSec]);
 
   if (!selectedWindow) {
     return null;
@@ -506,22 +579,24 @@ function WindowPreviewModal({
     trimStartSec + selectedWindow.endSec,
   );
   const hasDetectionClip = Boolean(detectionId);
-  const hasPreviewClip = !hasDetectionClip && Boolean(previewId);
+  const hasPreviewClip =
+    (!hasDetectionClip || detectionClipFailed) && Boolean(previewId);
   const clipDurationSec = Math.max(
     0.5,
     selectedWindow.endSec - selectedWindow.startSec,
   );
-  const videoUri = hasDetectionClip
-    ? getDetectionWindowClipUrl(
-        detectionId,
-        selectedWindow.startSec,
-        selectedWindow.endSec,
-      )
+  const shouldWaitForDetectionClip =
+    hasDetectionClip && isDetectionClipPreparing && !detectionClipFailed;
+  const videoUri = detectionClipUri
+    ? detectionClipUri
     : hasPreviewClip
       ? getVideoPreviewWindowClipUrl(previewId, sourceStartSec, sourceEndSec)
-    : fallbackVideoUri;
-  const playbackStartSec = hasDetectionClip || hasPreviewClip ? 0 : sourceStartSec;
-  const playbackEndSec = hasDetectionClip || hasPreviewClip
+      : shouldWaitForDetectionClip
+        ? ""
+        : fallbackVideoUri;
+  const usesPreparedClip = Boolean(detectionClipUri) || hasPreviewClip;
+  const playbackStartSec = usesPreparedClip ? 0 : sourceStartSec;
+  const playbackEndSec = usesPreparedClip
     ? clipDurationSec
     : sourceEndSec;
 
@@ -563,11 +638,17 @@ function WindowPreviewModal({
               endSec={playbackEndSec}
               height={previewSize.height}
               key={`${videoUri}-${playbackStartSec}-${playbackEndSec}`}
-              nativeControls={hasDetectionClip || hasPreviewClip}
+              nativeControls={usesPreparedClip}
               startSec={playbackStartSec}
               uri={videoUri}
               width={previewSize.width}
             />
+          ) : shouldWaitForDetectionClip ? (
+            <View style={styles.windowPreviewUnavailable}>
+              <Text selectable style={styles.windowPreviewUnavailableText}>
+                Preparing preview...
+              </Text>
+            </View>
           ) : (
             <View style={styles.windowPreviewUnavailable}>
               <Text selectable style={styles.windowPreviewUnavailableText}>

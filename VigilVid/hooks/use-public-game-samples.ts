@@ -97,7 +97,9 @@ function toSoloGameItem(item: GameClipResponseItem): SoloGameItem {
     sourceLabel: "",
     title: item.title,
     videoSource: {
+      contentType: "progressive",
       uri: item.videoUrl,
+      useCaching: true,
     },
   };
 }

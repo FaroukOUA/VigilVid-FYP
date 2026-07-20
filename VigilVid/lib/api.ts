@@ -25,6 +25,12 @@ const apiBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL ?? "")
 const missingApiBaseUrlMessage =
   "VigilVid is not connected yet. Please try again later.";
 
+export type PlaybackClipStatusResponse = {
+  retryAfterMs?: number;
+  status: "preparing" | "ready";
+  videoUrl?: string | null;
+};
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -75,6 +81,23 @@ export function getDetectionWindowClipUrl(
   return `${apiBaseUrl}/api/detections/${encodeURIComponent(
     detectionId,
   )}/window-clip.mp4?startSec=${startParam}&endSec=${endParam}`;
+}
+
+export async function getDetectionWindowClipStatus(
+  detectionId: string,
+  startSec: number,
+  endSec: number,
+  signal?: AbortSignal,
+) {
+  const startParam = encodeURIComponent(startSec.toFixed(3));
+  const endParam = encodeURIComponent(endSec.toFixed(3));
+
+  return fetchJson<PlaybackClipStatusResponse>(
+    `/api/detections/${encodeURIComponent(
+      detectionId,
+    )}/window-clip?startSec=${startParam}&endSec=${endParam}`,
+    { signal },
+  );
 }
 
 export async function createDetection(
@@ -241,6 +264,13 @@ export async function getGameClips(limit = 12, signal?: AbortSignal) {
   return fetchJson<GameClipsResponse>(`/api/game/clips?${searchParams}`, {
     signal,
   });
+}
+
+export async function getGameClipStatus(clipId: string, signal?: AbortSignal) {
+  return fetchJson<PlaybackClipStatusResponse>(
+    `/api/game/clips/${encodeURIComponent(clipId)}/ready`,
+    { signal },
+  );
 }
 
 async function fetchJson<T>(path: string, options: RequestInit = {}) {

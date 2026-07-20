@@ -58,6 +58,10 @@ GAME_CLIP_TRANSCODE_MODE=always
 GAME_CLIP_FFMPEG_PATH=
 GAME_CLIP_FFPROBE_PATH=
 GAME_CLIP_MAX_BYTES=209715200
+GAME_CLIP_PLAYBACK_VERSION=android-safe-v2
+GAME_CLIP_PREWARM_WORKERS=1
+PLAYBACK_WORKERS=1
+RESULT_PLAYBACK_TTL_SEC=2700
 ```
 
 `GAME_CLIP_LOCAL_EXPORT_ROOT` lets local development serve clips from the
@@ -65,7 +69,8 @@ unzipped export folder instead of downloading every clip from Hugging Face.
 `GAME_CLIP_TRANSCODE_MODE=always` is the safest Android setting and prepares
 phone-safe H.264/yuv420p/AAC MP4 clips before streaming. If Uvicorn cannot find
 FFmpeg on Windows, set `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` to
-the absolute `.exe` paths.
+the absolute `.exe` paths. `GAME_CLIP_PLAYBACK_VERSION` forces playable game
+clip cache regeneration when the ffmpeg output recipe changes.
 
 ## Local Setup
 

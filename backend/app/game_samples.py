@@ -39,6 +39,10 @@ GAME_CLIP_TRANSCODE_MODE = os.getenv(
 ).strip().lower()
 GAME_CLIP_FFMPEG_PATH = os.getenv("GAME_CLIP_FFMPEG_PATH", "").strip()
 GAME_CLIP_FFPROBE_PATH = os.getenv("GAME_CLIP_FFPROBE_PATH", "").strip()
+GAME_CLIP_PLAYBACK_VERSION = os.getenv(
+    "GAME_CLIP_PLAYBACK_VERSION",
+    "android-safe-v2",
+).strip()
 GAME_CLIP_CACHE_DIR = Path(tempfile.gettempdir()) / "vigilvid_game_clips"
 DEFAULT_LOCAL_EXPORT_ROOT = Path(__file__).resolve().parents[2] / "vigilvid_jepa21_test_export"
 GAME_CLIP_LOCAL_EXPORT_ROOT = os.getenv(
@@ -71,7 +75,12 @@ _clip_paths_by_id: dict[str, str] = {}
 _manifest_lock = Lock()
 _download_lock = Lock()
 _prepare_lock = Lock()
-_prewarm_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="game-clip")
+_preparing_clip_ids: set[str] = set()
+_preparing_lock = Lock()
+_prewarm_executor = ThreadPoolExecutor(
+    max_workers=int(os.getenv("GAME_CLIP_PREWARM_WORKERS", "1")),
+    thread_name_prefix="game-clip",
+)
 
 
 def get_game_round(limit: int, public_base_url: str) -> list[dict[str, object]]:
@@ -81,7 +90,7 @@ def get_game_round(limit: int, public_base_url: str) -> list[dict[str, object]]:
 
     round_limit = max(1, min(limit, 24))
     selected_samples = select_random_round(samples, round_limit)
-    prewarm_game_clips(selected_samples[:2])
+    prewarm_game_clips(selected_samples)
 
     return [
         build_game_sample_response(
@@ -117,6 +126,41 @@ def get_game_clip_file(clip_id: str) -> Path:
     )
 
 
+def get_game_clip_playback_status(
+    clip_id: str,
+) -> tuple[Literal["preparing", "ready"], Path | None]:
+    video_path = resolve_game_clip_path(clip_id)
+    playable_path = get_cached_clip_path(clip_id, video_path, "playable")
+
+    if playable_path.exists() and playable_path.stat().st_size > 0:
+        return "ready", playable_path
+
+    local_source_path = get_local_game_clip_path(video_path)
+    if local_source_path is not None and not should_transcode_game_clip(local_source_path):
+        return "ready", local_source_path
+
+    schedule_game_clip_preparation(clip_id)
+    return "preparing", None
+
+
+def schedule_game_clip_preparation(clip_id: str) -> None:
+    with _preparing_lock:
+        if clip_id in _preparing_clip_ids:
+            return
+        _preparing_clip_ids.add(clip_id)
+
+    def prepare_clip() -> None:
+        try:
+            get_game_clip_file(clip_id)
+        except GameSampleError:
+            pass
+        finally:
+            with _preparing_lock:
+                _preparing_clip_ids.discard(clip_id)
+
+    _prewarm_executor.submit(prepare_clip)
+
+
 def prepare_game_clip_for_playback(*, source_path: Path, playable_path: Path) -> Path:
     if not should_transcode_game_clip(source_path):
         return source_path
@@ -137,14 +181,8 @@ def prewarm_game_clips(samples: list[GameSample]) -> None:
     if not samples:
         return
 
-    def prepare_samples() -> None:
-        for sample in samples:
-            try:
-                get_game_clip_file(sample.id)
-            except GameSampleError:
-                continue
-
-    _prewarm_executor.submit(prepare_samples)
+    for sample in samples:
+        schedule_game_clip_preparation(sample.id)
 
 
 def download_game_clip(*, cache_path: Path, remote_url: str) -> Path:
@@ -230,7 +268,15 @@ def transcode_game_clip(source_path: Path, output_path: Path) -> Path:
         "-crf",
         "23",
         "-profile:v",
-        "main",
+        "baseline",
+        "-level",
+        "3.1",
+        "-bf",
+        "0",
+        "-g",
+        "60",
+        "-tag:v",
+        "avc1",
         "-c:a",
         "aac",
         "-b:a",
@@ -557,7 +603,10 @@ def resolve_game_clip_path(clip_id: str) -> str:
 
 
 def get_cached_clip_path(clip_id: str, video_path: str, variant: str) -> Path:
-    digest = hashlib.sha256(f"{clip_id}:{video_path}".encode("utf-8")).hexdigest()
+    cache_version = GAME_CLIP_PLAYBACK_VERSION if variant == "playable" else "source"
+    digest = hashlib.sha256(
+        f"{clip_id}:{video_path}:{variant}:{cache_version}".encode("utf-8"),
+    ).hexdigest()
     return GAME_CLIP_CACHE_DIR / variant / f"{digest[:24]}.mp4"
 
 

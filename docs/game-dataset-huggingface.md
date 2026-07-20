@@ -26,7 +26,7 @@ As of July 16, 2026:
 - The local audit passed decode for all 999 videos.
 - 199 videos need phone-safe transcoding for reliable Android playback.
 - Backend game clip serving uses `GAME_CLIP_TRANSCODE_MODE=always` by default
-  for reliable Android playback.
+  plus a readiness endpoint for reliable Android playback.
 - Supabase `public.game_sessions` exists and can be queried successfully for
   signed-in Solo score persistence.
 
@@ -232,9 +232,11 @@ Needs phone-safe transcode: 199
 
 Because many clips require phone-safe transcoding, the backend game clip proxy
 uses `GAME_CLIP_TRANSCODE_MODE=always` by default: it prepares phone-safe
-H.264/yuv420p/AAC MP4 clips before streaming. During local development, set
-`GAME_CLIP_LOCAL_EXPORT_ROOT` to the unzipped export folder so the backend does
-not have to download each game clip from Hugging Face.
+H.264/yuv420p/AAC MP4 clips before streaming. The app polls a readiness endpoint
+before mounting `VideoView`, which prevents Android from waiting on a still
+running transcode. During local development, set `GAME_CLIP_LOCAL_EXPORT_ROOT`
+to the unzipped export folder so the backend does not have to download each
+game clip from Hugging Face.
 
 ## Why Not Supabase For The Videos
 

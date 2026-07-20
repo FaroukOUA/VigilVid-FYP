@@ -124,8 +124,10 @@ Current implementation note:
 - URL preview detections can return a real backend-generated thumbnail strip with a continuous probability overlay from green through amber to red.
 - Local upload detections can return a backend-generated thumbnail strip when the upload is trimmed before analysis. Otherwise the result timeline may use the placeholder strip.
 - Result windows are tappable. Completed detections prefer a temporary
-  result-window clip generated from the analyzed segment. Local-file fallback
-  can still autoplay the selected range if backend playback data is unavailable.
+  result-window clip generated from the analyzed segment. The app first polls a
+  readiness endpoint, then plays the MP4 only after the backend has prepared it,
+  avoiding Android socket timeouts while ffmpeg runs. Local-file fallback can
+  still autoplay the selected range if backend playback data is unavailable.
 
 ## Account Flow
 

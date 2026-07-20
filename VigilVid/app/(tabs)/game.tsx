@@ -2,7 +2,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { useEvent } from "expo";
 import * as Haptics from "expo-haptics";
 import { Tabs, useFocusEffect } from "expo-router";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { type VideoSource, useVideoPlayer, VideoView } from "expo-video";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
@@ -32,10 +32,11 @@ import {
   useSoloGameProgress,
 } from "../../hooks/use-solo-game-progress";
 import { usePublicGameSamples } from "../../hooks/use-public-game-samples";
-import { submitGameScore } from "../../lib/api";
+import { getGameClipStatus, submitGameScore } from "../../lib/api";
 
 const roundScore = 100;
 const streakBonus = 20;
+const gameClipReadyMaxAttempts = 60;
 
 type ScoreSyncStatus = "idle" | "syncing" | "synced" | "skipped" | "failed";
 type FeatherIconName = keyof typeof Feather.glyphMap;
@@ -772,36 +773,119 @@ function getScoreSyncDetails(
 }
 
 function ClipPreview({ item }: { item: SoloGameItem }) {
-  const player = useVideoPlayer(item.videoSource, (videoPlayer) => {
+  const remoteVideoUri = getRemoteVideoUri(item.videoSource);
+  const [playbackError, setPlaybackError] = useState("");
+  const [playbackSource, setPlaybackSource] = useState<VideoSource | null>(
+    remoteVideoUri ? null : item.videoSource,
+  );
+  const [prepareMessage, setPrepareMessage] = useState("Preparing clip...");
+
+  useEffect(() => {
+    setPlaybackError("");
+
+    if (!remoteVideoUri) {
+      setPlaybackSource(item.videoSource);
+      setPrepareMessage("");
+      return undefined;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function prepareRemoteClip() {
+      setPlaybackSource(null);
+      setPrepareMessage("Preparing clip...");
+
+      try {
+        for (let attempt = 0; attempt < gameClipReadyMaxAttempts; attempt += 1) {
+          const clipStatus = await getGameClipStatus(item.id, controller.signal);
+
+          if (!isActive) {
+            return;
+          }
+
+          if (clipStatus.status === "ready" && clipStatus.videoUrl) {
+            setPlaybackSource({
+              contentType: "progressive",
+              uri: clipStatus.videoUrl,
+              useCaching: true,
+            });
+            setPrepareMessage("");
+            return;
+          }
+
+          await waitForClip(
+            Math.max(500, Math.min(2500, clipStatus.retryAfterMs ?? 1000)),
+            controller.signal,
+          );
+        }
+
+        if (isActive) {
+          setPlaybackError("This clip is taking too long to prepare.");
+          setPrepareMessage("");
+        }
+      } catch (error) {
+        if (!isActive || isAbortError(error)) {
+          return;
+        }
+
+        setPlaybackError("This clip could not load. Try another round.");
+        setPrepareMessage("");
+      }
+    }
+
+    void prepareRemoteClip();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [item.id, item.videoSource, remoteVideoUri]);
+
+  const player = useVideoPlayer(playbackSource, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.muted = false;
-    videoPlayer.play();
   });
   const { error, status } = useEvent(player, "statusChange", {
     error: undefined,
     status: player.status,
   });
 
+  useEffect(() => {
+    if (playbackSource) {
+      player.play();
+    }
+  }, [playbackSource, player]);
+
   return (
     <View style={styles.previewFrame}>
-      <VideoView
-        contentFit="contain"
-        nativeControls
-        player={player}
-        surfaceType="textureView"
-        style={styles.previewVideo}
-        useExoShutter={false}
-      />
-      {status === "loading" ? (
+      {playbackSource ? (
+        <VideoView
+          contentFit="contain"
+          nativeControls
+          player={player}
+          surfaceType="textureView"
+          style={styles.previewVideo}
+          useExoShutter={false}
+        />
+      ) : null}
+      {prepareMessage ? (
+        <View style={styles.previewStatusOverlay}>
+          <Text style={styles.previewStatusText}>{prepareMessage}</Text>
+        </View>
+      ) : null}
+      {status === "loading" && playbackSource ? (
         <View style={styles.previewStatusOverlay}>
           <Text style={styles.previewStatusText}>Preparing clip...</Text>
         </View>
       ) : null}
-      {status === "error" ? (
+      {playbackError || status === "error" ? (
         <View style={styles.previewStatusOverlay}>
           <Feather color={colors.surface} name="alert-circle" size={18} />
           <Text selectable style={styles.previewStatusText}>
-            {error?.message || "Video could not load. Try another round."}
+            {playbackError ||
+              error?.message ||
+              "Video could not load. Try another round."}
           </Text>
         </View>
       ) : null}
@@ -811,6 +895,45 @@ function ClipPreview({ item }: { item: SoloGameItem }) {
       </View>
     </View>
   );
+}
+
+function getRemoteVideoUri(source: VideoSource) {
+  if (typeof source === "string" && source.startsWith("http")) {
+    return source;
+  }
+
+  if (
+    source &&
+    typeof source === "object" &&
+    "uri" in source &&
+    typeof source.uri === "string" &&
+    source.uri.startsWith("http")
+  ) {
+    return source.uri;
+  }
+
+  return "";
+}
+
+function waitForClip(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(resolve, ms);
+
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timeout);
+        const error = new Error("Request was cancelled.");
+        error.name = "AbortError";
+        reject(error);
+      },
+      { once: true },
+    );
+  });
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function DuelProgressCard({

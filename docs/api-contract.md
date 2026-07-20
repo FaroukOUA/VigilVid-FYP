@@ -166,6 +166,47 @@ Rules:
   cannot scrub outside that window.
 - Requires `ffmpeg`.
 
+## GET `/api/detections/{detectionId}/window-clip`
+
+Returns readiness for one result-window MP4 and starts background preparation if
+the clip is not ready yet. The mobile app should poll this endpoint and mount
+the video player only after it returns `status: "ready"`.
+
+Query:
+
+```text
+startSec=0.0
+endSec=6.0
+```
+
+Response:
+
+```json
+{
+  "status": "preparing",
+  "videoUrl": null,
+  "retryAfterMs": 1000
+}
+```
+
+or:
+
+```json
+{
+  "status": "ready",
+  "videoUrl": "https://.../api/detections/det_abc/window-clip.mp4?startSec=0.000&endSec=6.000",
+  "retryAfterMs": 1000
+}
+```
+
+Rules:
+
+- Requires a completed detection whose temporary playback segment has not
+  expired.
+- This endpoint returns quickly. It must not block while ExoPlayer waits for
+  ffmpeg.
+- The backend also prewarms result-window clips after detection completion.
+
 ## GET `/api/detections/{detectionId}/window-clip.mp4`
 
 Returns an exact temporary MP4 clip for one result window from the analyzed
@@ -186,8 +227,8 @@ Rules:
   expired.
 - `startSec` and `endSec` are seconds within the analyzed segment returned in
   the detection result `windows` array.
-- The backend generates Android-safe H.264/yuv420p MP4 clips on demand and
-  caches them until the temporary result playback segment expires.
+- The backend serves an Android-safe H.264/yuv420p MP4 clip once it has been
+  prepared. If the clip is still preparing, this endpoint returns HTTP 425.
 - This is temporary processing data only. It must not be persisted to Supabase
   or Hugging Face.
 
@@ -488,6 +529,29 @@ Rules:
 - The Expo app receives only the backend URL.
 - Hugging Face tokens or dataset write credentials must never be exposed in Expo client code.
 - The endpoint is for game playback only, not user detection history.
+
+## GET `/api/game/clips/{clipId}/ready`
+
+Returns readiness for one game clip and starts background preparation if the
+clip is not ready yet. The Expo app should poll this before mounting
+`VideoView`, then play `videoUrl` with `useCaching: true`.
+
+Response:
+
+```json
+{
+  "status": "ready",
+  "videoUrl": "https://.../api/game/clips/vv_x/video.mp4",
+  "retryAfterMs": 1000
+}
+```
+
+Rules:
+
+- Returns quickly and does not stream the MP4 itself.
+- Uses the same backend-only transcoding/cache rules as the game video endpoint.
+- `GAME_CLIP_PLAYBACK_VERSION` can be bumped when the Android-safe ffmpeg output
+  recipe changes, forcing cached playable MP4 files to be regenerated.
 
 ## POST `/api/game/scores`
 
