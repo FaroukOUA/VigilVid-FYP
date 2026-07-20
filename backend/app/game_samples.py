@@ -40,6 +40,34 @@ def parse_env_id_set(value: str) -> set[str]:
     }
 
 
+def parse_env_bool(value: str, *, default: bool) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+
+    return default
+
+
+def load_verified_clip_ids() -> set[str]:
+    file_path = Path(__file__).with_name("game_verified_clip_ids.json")
+    try:
+        payload = json.loads(file_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+
+    ids = payload.get("ids") if isinstance(payload, dict) else None
+    if not isinstance(ids, list):
+        return set()
+
+    return {
+        normalize_clip_id(item)
+        for item in ids
+        if isinstance(item, str) and item.strip()
+    }
+
+
 HF_GAME_DATASET_ID = os.getenv(
     "HUGGING_FACE_GAME_DATASET_ID",
     "farouk04/vigilvid-research",
@@ -53,7 +81,7 @@ GAME_MANIFEST_CACHE_SEC = int(os.getenv("GAME_MANIFEST_CACHE_SEC", "300"))
 GAME_CLIP_MAX_BYTES = int(os.getenv("GAME_CLIP_MAX_BYTES", str(200 * 1024 * 1024)))
 GAME_CLIP_TRANSCODE_MODE = os.getenv(
     "GAME_CLIP_TRANSCODE_MODE",
-    os.getenv("GAME_CLIP_TRANSCODE_ENABLED", "always"),
+    os.getenv("GAME_CLIP_TRANSCODE_ENABLED", "never"),
 ).strip().lower()
 GAME_CLIP_FFMPEG_PATH = os.getenv("GAME_CLIP_FFMPEG_PATH", "").strip()
 GAME_CLIP_FFPROBE_PATH = os.getenv("GAME_CLIP_FFPROBE_PATH", "").strip()
@@ -62,10 +90,19 @@ GAME_CLIP_PLAYBACK_VERSION = os.getenv(
     "android-safe-v4",
 ).strip()
 GAME_CLIP_READY_BEFORE_RESPONSE = int(
-    os.getenv("GAME_CLIP_READY_BEFORE_RESPONSE", "1"),
+    os.getenv("GAME_CLIP_READY_BEFORE_RESPONSE", "0"),
 )
 GAME_CLIP_ALLOWED_IDS = parse_env_id_set(os.getenv("GAME_CLIP_ALLOWED_IDS", ""))
 GAME_CLIP_BLOCKED_IDS = parse_env_id_set(os.getenv("GAME_CLIP_BLOCKED_IDS", ""))
+GAME_CLIP_VERIFIED_ONLY = parse_env_bool(
+    os.getenv("GAME_CLIP_VERIFIED_ONLY", "true"),
+    default=True,
+)
+GAME_CLIP_FORCE_TRANSCODE = parse_env_bool(
+    os.getenv("GAME_CLIP_FORCE_TRANSCODE", "false"),
+    default=False,
+)
+GAME_CLIP_VERIFIED_IDS = load_verified_clip_ids()
 GAME_CLIP_CACHE_DIR = Path(tempfile.gettempdir()) / "vigilvid_game_clips"
 DEFAULT_LOCAL_EXPORT_ROOT = Path(__file__).resolve().parents[2] / "vigilvid_jepa21_test_export"
 GAME_CLIP_LOCAL_EXPORT_ROOT = os.getenv(
@@ -113,7 +150,10 @@ def get_game_round(limit: int, public_base_url: str) -> list[dict[str, object]]:
 
     round_limit = max(1, min(limit, 24))
     selected_samples = select_random_round(samples, round_limit)
-    prepared_count = max(0, min(GAME_CLIP_READY_BEFORE_RESPONSE, len(selected_samples)))
+    prepared_count = 0 if GAME_CLIP_VERIFIED_ONLY else max(
+        0,
+        min(GAME_CLIP_READY_BEFORE_RESPONSE, len(selected_samples)),
+    )
     prepare_game_clips_before_response(selected_samples[:prepared_count])
     prewarm_game_clips(selected_samples[prepared_count:])
 
@@ -133,6 +173,9 @@ def get_game_clip_file(clip_id: str) -> Path:
     local_source_path = get_local_game_clip_path(video_path)
 
     if local_source_path is not None:
+        if should_serve_verified_clip_directly(clip_id):
+            return local_source_path
+
         return prepare_game_clip_for_playback(
             playable_path=playable_path,
             source_path=local_source_path,
@@ -144,6 +187,9 @@ def get_game_clip_file(clip_id: str) -> Path:
         cache_path=source_path,
         remote_url=remote_url,
     )
+
+    if should_serve_verified_clip_directly(clip_id):
+        return source_path
 
     return prepare_game_clip_for_playback(
         playable_path=playable_path,
@@ -161,6 +207,9 @@ def get_game_clip_playback_status(
         return "ready", playable_path
 
     local_source_path = get_local_game_clip_path(video_path)
+    if local_source_path is not None and should_serve_verified_clip_directly(clip_id):
+        return "ready", local_source_path
+
     if local_source_path is not None and not should_transcode_game_clip(local_source_path):
         return "ready", local_source_path
 
@@ -380,6 +429,14 @@ def should_transcode_game_clip(source_path: Path) -> bool:
     return not is_phone_safe_game_clip(source_path)
 
 
+def should_serve_verified_clip_directly(clip_id: str) -> bool:
+    return (
+        GAME_CLIP_VERIFIED_ONLY
+        and not GAME_CLIP_FORCE_TRANSCODE
+        and normalize_clip_id(clip_id) in GAME_CLIP_VERIFIED_IDS
+    )
+
+
 def is_phone_safe_game_clip(source_path: Path) -> bool:
     ffprobe_path = find_ffprobe_path()
     if ffprobe_path is None:
@@ -521,10 +578,16 @@ def filter_game_samples(samples: list[GameSample]) -> list[GameSample]:
 
 def should_include_game_sample(sample: GameSample) -> bool:
     sample_id = normalize_clip_id(sample.id)
-    if GAME_CLIP_ALLOWED_IDS and sample_id not in GAME_CLIP_ALLOWED_IDS:
+    if sample_id in GAME_CLIP_BLOCKED_IDS:
         return False
 
-    return sample_id not in GAME_CLIP_BLOCKED_IDS
+    if GAME_CLIP_ALLOWED_IDS:
+        return sample_id in GAME_CLIP_ALLOWED_IDS
+
+    if GAME_CLIP_VERIFIED_ONLY and GAME_CLIP_VERIFIED_IDS:
+        return sample_id in GAME_CLIP_VERIFIED_IDS
+
+    return True
 
 
 def parse_game_manifest_item(value: object) -> GameSample | None:

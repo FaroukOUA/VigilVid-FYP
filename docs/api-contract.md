@@ -517,10 +517,11 @@ Rules:
 - The backend serves the matching local export video when available. Otherwise,
   it downloads the public Hugging Face Dataset video on demand and caches it
   locally.
-- `GAME_CLIP_TRANSCODE_MODE=always` is the default. `auto` is also intentionally
-  conservative and prepares clips as H.264/yuv420p/AAC MP4 capped to a 1280px
-  playback box to protect Android playback from unsupported encodings and
-  green-screen playback.
+- Public game rounds default to `GAME_CLIP_VERIFIED_ONLY=true`, which filters
+  to audited phone-safe clips listed in the backend.
+- `GAME_CLIP_TRANSCODE_MODE=never` is the hosted default for game clips to avoid
+  slow on-demand FFmpeg jobs. `always` and `auto` remain available for local
+  experiments.
 - Supported transcode modes: `always`/`true`, `auto`, and `never`/`false`.
 - Optional settings:
   - `GAME_CLIP_LOCAL_EXPORT_ROOT`, defaulting to `../vigilvid_jepa21_test_export`
@@ -528,6 +529,10 @@ Rules:
   - `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` for explicit Windows
     executable paths when PATH resolution fails.
   - `GAME_CLIP_MAX_BYTES`, defaulting to `209715200`.
+  - `GAME_CLIP_VERIFIED_ONLY`, defaulting to `true`.
+  - `GAME_CLIP_FORCE_TRANSCODE`, defaulting to `false`. When false, verified
+    clips bypass game transcoding even if an old transcode mode env var remains
+    set.
   - `GAME_CLIP_BLOCKED_IDS`, comma-separated IDs excluded from game rounds.
   - `GAME_CLIP_ALLOWED_IDS`, comma-separated verified IDs. When set, only these
     IDs can appear in game rounds.
@@ -542,7 +547,7 @@ Rules:
 Returns readiness for one game clip and starts background preparation if the
 clip is not ready yet. This endpoint is a backend helper. The current Expo app
 plays the `videoUrl` returned by `GET /api/game/clips`; the backend prepares the
-first selected clip before returning the round and prewarms the rest.
+selected clips in the background when prewarming is enabled.
 
 Response:
 
@@ -562,6 +567,9 @@ Rules:
   playback.
 - `GAME_CLIP_PLAYBACK_VERSION` can be bumped when the Android-safe ffmpeg output
   recipe changes, forcing cached playable MP4 files to be regenerated.
+- Keep `GAME_CLIP_READY_BEFORE_RESPONSE=0` on hosted demos so round metadata
+  returns immediately instead of waiting on remote downloads or FFmpeg. Verified
+  mode enforces this behavior for public game rounds.
 
 ## POST `/api/game/scores`
 

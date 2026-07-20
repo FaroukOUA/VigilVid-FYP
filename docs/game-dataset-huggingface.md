@@ -25,8 +25,9 @@ As of July 16, 2026:
   JSONL, evaluation metrics, and copied test videos.
 - The local audit passed decode for all 999 videos.
 - 199 videos need phone-safe transcoding for reliable Android playback.
-- Backend game clip serving uses `GAME_CLIP_TRANSCODE_MODE=always` by default
-  and prepares the first selected round clip before returning game metadata.
+- Backend game clip serving uses `GAME_CLIP_VERIFIED_ONLY=true` and
+  `GAME_CLIP_TRANSCODE_MODE=never` by default for public demos, so hosted game
+  rounds use only audited phone-safe clips without runtime transcoding.
 - Bad real-device playback clips can be excluded without editing the dataset by
   setting backend `GAME_CLIP_BLOCKED_IDS`, or by setting
   `GAME_CLIP_ALLOWED_IDS` to a verified-only clip set.
@@ -233,12 +234,11 @@ Failed decode: 0
 Needs phone-safe transcode: 199
 ```
 
-Because many clips require phone-safe transcoding, the backend game clip proxy
-uses `GAME_CLIP_TRANSCODE_MODE=always` by default: it prepares phone-safe
-H.264/yuv420p/AAC MP4 clips capped to a 1280px playback box before streaming.
-The backend prepares the first selected round clip before returning game
-metadata, then warms the remaining selected clips in the background. During
-local development, set
+Because many clips require phone-safe transcoding, the public game should not
+sample randomly from all 999 research clips. The backend defaults to an audited
+verified clip pool in `backend/app/game_verified_clip_ids.json`, bypasses game
+transcoding for verified clips, and returns game metadata without waiting for
+clip preparation. During local development, set
 `GAME_CLIP_LOCAL_EXPORT_ROOT` to the unzipped export folder so the backend does
 not have to download each game clip from Hugging Face.
 

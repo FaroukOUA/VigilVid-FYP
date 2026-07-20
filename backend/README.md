@@ -17,10 +17,10 @@ backend requirements include a packaged FFmpeg fallback, while `ffprobe` or
 explicit tool paths remain supported when available. The app will show a clear
 setup error if no usable video tool is available.
 
-Game clips are also proxied through the backend. By default the backend
-transcodes game clips to phone-safe H.264/AAC MP4 before serving them to Expo,
-which avoids odd dataset encodings showing as unsupported or green video on
-Android.
+Game clips are also proxied through the backend. By default the public game
+uses the audited verified clip pool in `app/game_verified_clip_ids.json` and
+does not transcode game clips at runtime. This avoids long on-demand FFmpeg
+jobs on hosted services while keeping the Expo app on backend URLs only.
 
 When the real Hugging Face call is enabled, put the token here:
 
@@ -55,14 +55,16 @@ For game clips, keep these backend-only settings:
 ```env
 HUGGING_FACE_GAME_DATASET_ID=farouk04/vigilvid-research
 GAME_CLIP_LOCAL_EXPORT_ROOT=../vigilvid_jepa21_test_export
-GAME_CLIP_TRANSCODE_MODE=always
+GAME_CLIP_VERIFIED_ONLY=true
+GAME_CLIP_FORCE_TRANSCODE=false
+GAME_CLIP_TRANSCODE_MODE=never
 GAME_CLIP_FFMPEG_PATH=
 GAME_CLIP_FFPROBE_PATH=
 GAME_CLIP_MAX_BYTES=209715200
 GAME_CLIP_PLAYBACK_VERSION=android-safe-v4
 GAME_CLIP_ALLOWED_IDS=
 GAME_CLIP_BLOCKED_IDS=
-GAME_CLIP_READY_BEFORE_RESPONSE=1
+GAME_CLIP_READY_BEFORE_RESPONSE=0
 GAME_CLIP_PREWARM_WORKERS=1
 PLAYBACK_WORKERS=1
 RESULT_PLAYBACK_TTL_SEC=2700
@@ -70,14 +72,18 @@ RESULT_PLAYBACK_TTL_SEC=2700
 
 `GAME_CLIP_LOCAL_EXPORT_ROOT` lets local development serve clips from the
 unzipped export folder instead of downloading every clip from Hugging Face.
-`GAME_CLIP_TRANSCODE_MODE=always` is the safest Android setting and prepares
-phone-safe H.264/yuv420p/AAC MP4 clips before streaming. If Uvicorn cannot find
-FFmpeg on Windows, set `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` to
-the absolute `.exe` paths. If these are empty, the backend tries system PATH
-and then the packaged FFmpeg fallback. `GAME_CLIP_PLAYBACK_VERSION` forces
-playable game clip cache regeneration when the ffmpeg output recipe changes.
+`GAME_CLIP_VERIFIED_ONLY=true` limits public rounds to audited clips that should
+play without runtime transcoding. Verified clips bypass game transcoding unless
+`GAME_CLIP_FORCE_TRANSCODE=true`, which protects hosted deployments from an old
+`GAME_CLIP_TRANSCODE_MODE=always` value. `GAME_CLIP_TRANSCODE_MODE=never` keeps
+game startup fast; use `always` only for local experiments, because hosted
+on-demand transcoding can time out. If Uvicorn cannot find FFmpeg on Windows,
+set `GAME_CLIP_FFMPEG_PATH` and `GAME_CLIP_FFPROBE_PATH` to the absolute `.exe`
+paths. If these are empty, the backend tries system PATH and then the packaged
+FFmpeg fallback. `GAME_CLIP_PLAYBACK_VERSION` forces playable game clip cache
+regeneration when the ffmpeg output recipe changes.
 `GAME_CLIP_READY_BEFORE_RESPONSE` controls how many selected clips are prepared
-before the round response is returned.
+before the round response is returned. Keep it at `0` for hosted public demos.
 Use `GAME_CLIP_BLOCKED_IDS` to exclude specific Hugging Face clip IDs that fail
 on a real phone. Use `GAME_CLIP_ALLOWED_IDS` for a stricter verified-only set.
 
