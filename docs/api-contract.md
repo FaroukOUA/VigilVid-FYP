@@ -131,6 +131,8 @@ Rules:
   backend can use packaged FFmpeg when system tools are unavailable.
 - URL source videos may be longer than 2 minutes for preview, but analysis must use a selected segment of 2 minutes or less.
 - The selected segment must also stay within the 100 MB analysis limit.
+- Hosted previews default to a 150 MB source download limit
+  (`VIDEO_PREVIEW_MAX_DOWNLOAD_MB`) to keep 512 MB Render instances stable.
 - Raw downloaded URL videos are temporary backend files and must not be stored unless separate research retention is enabled later.
 
 ## GET `/api/video-previews/{previewId}/video.mp4`
@@ -212,6 +214,9 @@ Rules:
 - The backend also prewarms a small number of high-signal result-window clips
   after detection completion. It must not queue every window and block user
   requested clips behind unnecessary work.
+- Hosted deployments should use conservative worker counts:
+  `DETECTION_WORKERS=1`, `PLAYBACK_WORKERS=1`, and
+  `MAX_PREWARM_WINDOW_CLIPS=1` for 512 MB Render instances.
 
 ## GET `/api/detections/{detectionId}/window-clip.mp4`
 

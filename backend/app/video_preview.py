@@ -17,7 +17,7 @@ import httpx
 
 ANALYSIS_MAX_DURATION_SEC = 120.0
 ANALYSIS_MAX_BYTES = 100 * 1024 * 1024
-DEFAULT_SOURCE_DOWNLOAD_LIMIT_MB = 250
+DEFAULT_SOURCE_DOWNLOAD_LIMIT_MB = 150
 DIRECT_DOWNLOAD_TIMEOUT_SEC = 75.0
 LOOKUP_TIMEOUT_SEC = 20.0
 PREVIEW_TTL_SEC = 30 * 60
@@ -810,6 +810,9 @@ def trim_video_segment(
         [
             ffmpeg_path,
             "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-ss",
             f"{start_sec:.3f}",
             "-i",
@@ -873,6 +876,9 @@ def trim_video_window_clip(
         [
             ffmpeg_path,
             "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-ss",
             f"{start_sec:.3f}",
             "-i",

@@ -173,13 +173,13 @@ detection_window_clip_preparing: set[tuple[str, int, int]] = set()
 detection_feedback: list[DetectionFeedback] = []
 detection_jobs_lock = Lock()
 detection_executor = ThreadPoolExecutor(
-    max_workers=int(os.getenv("DETECTION_WORKERS", "2")),
+    max_workers=int(os.getenv("DETECTION_WORKERS", "1")),
 )
 playback_executor = ThreadPoolExecutor(
     max_workers=int(os.getenv("PLAYBACK_WORKERS", "1")),
 )
 RESULT_PLAYBACK_TTL_SEC = int(os.getenv("RESULT_PLAYBACK_TTL_SEC", str(45 * 60)))
-MAX_PREWARM_WINDOW_CLIPS = int(os.getenv("MAX_PREWARM_WINDOW_CLIPS", "3"))
+MAX_PREWARM_WINDOW_CLIPS = int(os.getenv("MAX_PREWARM_WINDOW_CLIPS", "1"))
 
 
 @app.get("/health")
