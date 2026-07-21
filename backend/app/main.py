@@ -48,6 +48,7 @@ from app.video_preview import (
     create_analysis_segment,
     create_uploaded_video_preview,
     create_url_video_preview,
+    get_video_preview,
     get_video_preview_media,
     get_video_preview_window_clip,
     generate_thumbnail_strip,
@@ -143,6 +144,10 @@ class DetectionJob:
     original_url: str | None = None
     idempotency_key: str | None = None
     thumbnail_strip_url: str | None = None
+    preview_id: str | None = None
+    trim_start_sec: float | None = None
+    trim_end_sec: float | None = None
+    public_base_url: str | None = None
     status: Literal["queued", "processing", "completed", "failed"] = "queued"
     progress_message: str = "Preparing video"
     result: dict[str, object] | None = None
@@ -521,35 +526,35 @@ def build_preview_detection_job(
             detail="Choose a video or paste a video link.",
         )
 
+    preview = get_video_preview(request.preview_id or "")
+    if preview is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "The video preview expired. Paste the link again and create a "
+                "new preview."
+            ),
+        )
+
     try:
-        preview, segment_path, file_size_bytes, thumbnail_path = create_analysis_segment(
-            preview_id=request.preview_id or "",
-            trim_start_sec=request.trim_start_sec,
-            trim_end_sec=request.trim_end_sec,
-            detection_id=detection_id,
+        normalize_trim_range(
+            request.trim_start_sec,
+            request.trim_end_sec,
+            preview.duration_sec,
         )
     except VideoPreviewError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-
-    thumbnail_strip_url = None
-    if thumbnail_path is not None:
-        detection_thumbnail_strips[detection_id] = thumbnail_path
-        thumbnail_strip_url = (
-            f"{public_base_url}/api/detections/{detection_id}"
-            "/thumbnail-strip.jpg"
-        )
 
     return DetectionJob(
         detection_id=detection_id,
         created_at=time.monotonic(),
         source_type=preview.source_type,
         user_id=user_id,
-        file_path=segment_path,
-        file_name=f"{preview.preview_id}.mp4",
-        content_type="video/mp4",
-        file_size_bytes=file_size_bytes,
         original_url=preview.original_url,
-        thumbnail_strip_url=thumbnail_strip_url,
+        preview_id=preview.preview_id,
+        trim_start_sec=request.trim_start_sec,
+        trim_end_sec=request.trim_end_sec,
+        public_base_url=public_base_url,
     )
 
 
@@ -573,7 +578,7 @@ async def parse_json_detection_request(http_request: Request) -> DetectionCreate
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=exc.errors(),
+            detail="VigilVid could not read this request. Try again.",
         ) from exc
     except Exception as exc:
         raise HTTPException(
@@ -1137,9 +1142,18 @@ def process_detection_job(detection_id: str) -> None:
         if job is None:
             return
         job.status = "processing"
-        job.progress_message = "Checking video"
+        job.progress_message = (
+            "Preparing selected part" if job.preview_id else "Checking video"
+        )
 
     try:
+        prepare_preview_segment_for_detection(job)
+
+        with detection_jobs_lock:
+            current_job = detection_jobs.get(detection_id)
+            if current_job is not None:
+                current_job.progress_message = "Checking video"
+
         if get_detection_backend_mode() == "mock":
             time.sleep(3.2)
             result = build_mock_detection_result(job)
@@ -1179,6 +1193,9 @@ def process_detection_job(detection_id: str) -> None:
             prewarm_detection_window_clips(detection_id, result)
 
         persist_detection_result_safely(job, result)
+    except VideoPreviewError as exc:
+        logger.warning("Detection video preparation failed: %s", exc.error_code)
+        fail_detection_job(detection_id, exc.error_code, str(exc))
     except DetectionRuntimeError as exc:
         logger.warning("Detection job failed: %s", exc.error_code)
         fail_detection_job(detection_id, exc.error_code, str(exc))
@@ -1191,6 +1208,50 @@ def process_detection_job(detection_id: str) -> None:
         )
     finally:
         cleanup_job_upload(detection_id)
+
+
+def prepare_preview_segment_for_detection(job: DetectionJob) -> None:
+    if not job.preview_id:
+        return
+
+    preview, segment_path, file_size_bytes, thumbnail_path = create_analysis_segment(
+        preview_id=job.preview_id,
+        trim_start_sec=job.trim_start_sec,
+        trim_end_sec=job.trim_end_sec,
+        detection_id=job.detection_id,
+    )
+
+    thumbnail_strip_url = None
+    if thumbnail_path is not None:
+        detection_thumbnail_strips[job.detection_id] = thumbnail_path
+        public_base_url = (job.public_base_url or "").rstrip("/")
+        if public_base_url:
+            thumbnail_strip_url = (
+                f"{public_base_url}/api/detections/{job.detection_id}"
+                "/thumbnail-strip.jpg"
+            )
+
+    with detection_jobs_lock:
+        current_job = detection_jobs.get(job.detection_id)
+        if current_job is None:
+            cleanup_uploaded_file(segment_path)
+            return
+
+        current_job.source_type = preview.source_type
+        current_job.file_path = segment_path
+        current_job.file_name = f"{preview.preview_id}.mp4"
+        current_job.content_type = "video/mp4"
+        current_job.file_size_bytes = file_size_bytes
+        current_job.original_url = preview.original_url
+        current_job.thumbnail_strip_url = thumbnail_strip_url
+
+    job.source_type = preview.source_type
+    job.file_path = segment_path
+    job.file_name = f"{preview.preview_id}.mp4"
+    job.content_type = "video/mp4"
+    job.file_size_bytes = file_size_bytes
+    job.original_url = preview.original_url
+    job.thumbnail_strip_url = thumbnail_strip_url
 
 
 def persist_detection_result_safely(

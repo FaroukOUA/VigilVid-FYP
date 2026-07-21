@@ -294,7 +294,10 @@ async function fetchJson<T>(path: string, options: RequestInit = {}) {
   const json = await readJson(response);
 
   if (!response.ok) {
-    throw new ApiError(getErrorMessage(json) ?? "Request failed.", response.status);
+    throw new ApiError(
+      getErrorMessage(json) ?? getFallbackErrorMessage(response.status),
+      response.status,
+    );
   }
 
   return json as T;
@@ -323,9 +326,31 @@ function getErrorMessage(value: unknown) {
   if (typeof detail === "string") {
     return detail;
   }
+  if (Array.isArray(detail)) {
+    return "VigilVid could not read this request. Try again.";
+  }
+  if (isRecord(detail) && typeof detail.message === "string") {
+    return detail.message;
+  }
 
   const message = value.message;
   return typeof message === "string" ? message : null;
+}
+
+function getFallbackErrorMessage(status: number) {
+  if (status === 408 || status === 425 || status === 504) {
+    return "This is taking too long. Try again with a shorter part.";
+  }
+
+  if (status === 413) {
+    return "This video part is too large. Choose a shorter part.";
+  }
+
+  if (status >= 500) {
+    return "VigilVid could not check this video right now. Try again later.";
+  }
+
+  return "VigilVid could not complete this request. Try again.";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

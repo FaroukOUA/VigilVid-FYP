@@ -34,7 +34,8 @@ import {
   ApiError,
   createDetection,
   getDetection,
-  getVideoPreviewVideoUrl,
+  getDetectionWindowClipStatus,
+  getVideoPreviewWindowClipUrl,
 } from "../lib/api";
 import { detectRoute } from "../lib/routes";
 import { useAuth } from "../hooks/use-auth";
@@ -475,6 +476,7 @@ function WindowVideoPreview({
 }
 
 function WindowPreviewModal({
+  detectionId,
   fallbackVideoUri,
   onClose,
   previewId,
@@ -482,6 +484,7 @@ function WindowPreviewModal({
   trimStartSec,
   videoAspectRatio,
 }: {
+  detectionId: string;
   fallbackVideoUri: string;
   onClose: () => void;
   previewId: string;
@@ -490,6 +493,81 @@ function WindowPreviewModal({
   videoAspectRatio: number;
 }) {
   const windowDimensions = useWindowDimensions();
+  const [clipError, setClipError] = useState("");
+  const [clipStatus, setClipStatus] = useState<
+    "idle" | "loading" | "ready" | "failed"
+  >("idle");
+  const [clipUri, setClipUri] = useState("");
+
+  const sourceStartSec = selectedWindow
+    ? Math.max(0, trimStartSec + selectedWindow.startSec)
+    : 0;
+  const sourceEndSec = selectedWindow
+    ? Math.max(sourceStartSec + 0.5, trimStartSec + selectedWindow.endSec)
+    : 0;
+  const windowDurationSec = Math.max(0.5, sourceEndSec - sourceStartSec);
+
+  useEffect(() => {
+    if (!selectedWindow || !detectionId) {
+      setClipError("");
+      setClipStatus("idle");
+      setClipUri("");
+      return undefined;
+    }
+
+    const windowToPreview = selectedWindow;
+    let isActive = true;
+    const controller = new AbortController();
+
+    async function loadPreparedClip() {
+      setClipError("");
+      setClipStatus("loading");
+      setClipUri("");
+
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        try {
+          const state = await getDetectionWindowClipStatus(
+            detectionId,
+            windowToPreview.startSec,
+            windowToPreview.endSec,
+            controller.signal,
+          );
+
+          if (!isActive) {
+            return;
+          }
+
+          if (state.status === "ready" && state.videoUrl) {
+            setClipUri(state.videoUrl);
+            setClipStatus("ready");
+            return;
+          }
+
+          await wait(state.retryAfterMs ?? 1000, controller.signal);
+        } catch (error) {
+          if (!isActive || isAbortError(error)) {
+            return;
+          }
+
+          setClipError(getReadableError(error));
+          setClipStatus("failed");
+          return;
+        }
+      }
+
+      if (isActive) {
+        setClipError("This moment preview is still preparing. Try again.");
+        setClipStatus("failed");
+      }
+    }
+
+    void loadPreparedClip();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [detectionId, selectedWindow]);
 
   if (!selectedWindow) {
     return null;
@@ -500,16 +578,15 @@ function WindowPreviewModal({
     screenHeight: windowDimensions.height,
     screenWidth: windowDimensions.width,
   });
-  const sourceStartSec = Math.max(0, trimStartSec + selectedWindow.startSec);
-  const sourceEndSec = Math.max(
-    sourceStartSec + 0.5,
-    trimStartSec + selectedWindow.endSec,
-  );
-  const videoUri = previewId
-    ? getVideoPreviewVideoUrl(previewId)
-    : fallbackVideoUri;
-  const playbackStartSec = sourceStartSec;
-  const playbackEndSec = sourceEndSec;
+  const previewClipUri = previewId
+    ? getVideoPreviewWindowClipUrl(previewId, sourceStartSec, sourceEndSec)
+    : "";
+  const shouldUseFallback = !detectionId || clipStatus === "failed";
+  const videoUri =
+    clipUri || (shouldUseFallback ? previewClipUri || fallbackVideoUri : "");
+  const usesExactClip = Boolean(clipUri || previewClipUri);
+  const playbackStartSec = usesExactClip ? 0 : sourceStartSec;
+  const playbackEndSec = usesExactClip ? windowDurationSec : sourceEndSec;
 
   return (
     <Modal
@@ -557,8 +634,10 @@ function WindowPreviewModal({
           ) : (
             <View style={styles.windowPreviewUnavailable}>
               <Text selectable style={styles.windowPreviewUnavailableText}>
-                This preview is unavailable. Go back and check the video again
-                to create a fresh preview.
+                {clipStatus === "loading"
+                  ? "Preparing preview..."
+                  : clipError ||
+                    "This preview is unavailable. Go back and check the video again."}
               </Text>
             </View>
           )}
@@ -1054,6 +1133,7 @@ export default function AnalysisScreen() {
         ) : null}
       </ScrollView>
       <WindowPreviewModal
+        detectionId={result?.detectionId ?? ""}
         fallbackVideoUri={fallbackVideoUri}
         onClose={() => setSelectedWindow(null)}
         previewId={source.previewId}

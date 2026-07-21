@@ -409,30 +409,38 @@ def create_analysis_segment(
         )
 
     segment_path = build_temp_path(f"{detection_id}_segment", ".mp4")
-    trim_video_segment(
-        source_path=preview.file_path,
-        target_path=segment_path,
-        start_sec=start_sec,
-        duration_sec=duration_sec,
-    )
+    thumbnail_path: Path | None = None
 
-    file_size_bytes = segment_path.stat().st_size
-    if file_size_bytes > ANALYSIS_MAX_BYTES:
-        cleanup_file(segment_path)
-        raise VideoPreviewError(
-            "The selected video part is larger than 100 MB. Choose a shorter part.",
-            error_code="segment_too_large",
-            status_code=413,
+    try:
+        trim_video_segment(
+            source_path=preview.file_path,
+            target_path=segment_path,
+            start_sec=start_sec,
+            duration_sec=duration_sec,
         )
 
-    thumbnail_path = generate_thumbnail_strip(
-        preview.file_path,
-        file_id=detection_id,
-        duration_sec=preview.duration_sec,
-        start_sec=start_sec,
-        end_sec=end_sec,
-        variant="result",
-    )
+        file_size_bytes = segment_path.stat().st_size
+        if file_size_bytes > ANALYSIS_MAX_BYTES:
+            raise VideoPreviewError(
+                "The selected video part is larger than 100 MB. Choose a shorter part.",
+                error_code="segment_too_large",
+                status_code=413,
+            )
+
+        thumbnail_path = generate_thumbnail_strip(
+            preview.file_path,
+            file_id=detection_id,
+            duration_sec=preview.duration_sec,
+            start_sec=start_sec,
+            end_sec=end_sec,
+            variant="result",
+        )
+    except Exception:
+        cleanup_file(segment_path)
+        if thumbnail_path is not None:
+            cleanup_file(thumbnail_path)
+        raise
+
     return preview, segment_path, file_size_bytes, thumbnail_path
 
 
@@ -802,22 +810,47 @@ def trim_video_segment(
         [
             ffmpeg_path,
             "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
             "-ss",
             f"{start_sec:.3f}",
             "-i",
             str(source_path),
             "-t",
             f"{duration_sec:.3f}",
-            "-c",
-            "copy",
-            "-avoid_negative_ts",
-            "make_zero",
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-vf",
+            PHONE_SAFE_VIDEO_FILTER,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "23",
+            "-profile:v",
+            "baseline",
+            "-pix_fmt",
+            "yuv420p",
+            "-level",
+            "3.1",
+            "-bf",
+            "0",
+            "-g",
+            "60",
+            "-tag:v",
+            "avc1",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-movflags",
+            "+faststart",
+            "-f",
+            "mp4",
             str(target_path),
         ],
-        timeout_sec=90,
+        timeout_sec=180,
     )
 
     if not target_path.exists() or target_path.stat().st_size == 0:
