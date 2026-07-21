@@ -109,7 +109,7 @@ Screens should compose components and call hooks/stores. Keep business logic in 
 - Use local state for temporary UI state.
 - Use Zustand for cross-screen client state.
 - Use AsyncStorage for lightweight local persistence.
-- Use Supabase for authenticated history, game scores, feedback, and future
+- Use Supabase for authenticated history, game scores, and future
   aggregate insights metadata.
 - Do not store raw user-submitted videos. History stores result summaries only.
 

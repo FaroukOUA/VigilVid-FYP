@@ -146,14 +146,14 @@ Tasks:
 - Build Result screen.
 - Show probability, verdict, duration, processing time, and suspicious windows.
 - Add shareable result card.
-- Add feedback/report action.
+- Add external report action.
 - Add honest model-limit explanation.
 
 Done when:
 
 - User can understand the result without technical background.
 - Result card can be shared.
-- False positive/false negative report can be submitted.
+- External report page opens from the result screen.
 
 ## Phase 5: Account, History, Privacy
 
@@ -217,7 +217,7 @@ The mobile app Insights tab remains deferred.
 
 Tasks:
 
-- Use aggregate Supabase metadata from signed-in saved checks, feedback, and game data.
+- Use aggregate Supabase metadata from signed-in saved checks and game data.
 - Add mobile Insights tab if it returns to scope.
 - Add aggregate stats endpoint.
 - Show saved-check volume, human accuracy, model-vs-user trends, and common missed patterns.

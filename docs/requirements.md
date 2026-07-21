@@ -24,7 +24,7 @@ modes.
 - Core detection works without account.
 - User-submitted videos are not retained after checking.
 - Signed-in checks save result summaries to History automatically.
-- Supabase stores app metadata: users, history, scores, feedback, and future
+- Supabase stores app metadata: users, history, scores, and future
   aggregate insights.
 - Public web interface covers project introduction, app download, privacy, and a
   separate aggregate Insights page.
@@ -46,7 +46,8 @@ modes.
 - Return and display AI-generated probability as a percentage.
 - Show a four-level verdict derived from AI-generated probability: real, partially real, partially fake, or fake.
 - Show suspicious time windows using the model's per-window probabilities.
-- Support false positive and false negative reporting.
+- Link users to an external fake-content report channel when they want to
+  report suspicious content.
 
 ### Result Screen
 
@@ -56,7 +57,8 @@ modes.
 - Show suspicious window breakdown.
 - Include a plain-language explanation that is honest about model limits.
 - Include shareable result card behavior.
-- Include feedback/report button.
+- Include an external report button. Do not store internal detection feedback
+  in v1.
 
 ### Privacy
 

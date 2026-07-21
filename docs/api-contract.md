@@ -393,41 +393,6 @@ Failed response:
 }
 ```
 
-## POST `/api/detections/{detectionId}/feedback`
-
-Records disputed result feedback.
-
-Request:
-
-```json
-{
-  "feedbackType": "false_positive",
-  "comment": "This is my original video.",
-  "allowResearchUse": true
-}
-```
-
-Allowed `feedbackType` values:
-
-- `false_positive`
-- `false_negative`
-- `unclear_result`
-- `other`
-
-Response:
-
-```json
-{
-  "ok": true
-}
-```
-
-Persistence:
-
-- Feedback is kept in memory for local development.
-- When backend Supabase persistence is enabled, feedback is also written through the server-side service role key.
-- The Expo app must never write directly to the feedback table.
-
 ## GET `/api/history`
 
 Returns saved detection summaries for the signed-in user.
@@ -634,7 +599,7 @@ limit 20;
 
 ## Supabase Persistence
 
-Supabase is the metadata store for account history, feedback, game scores,
+Supabase is the metadata store for account history, game scores,
 leaderboards, and aggregate insights. Core detection remains usable when
 Supabase is not configured.
 
@@ -643,7 +608,8 @@ Initial persistence rules:
 - Completed detection metadata is written automatically for signed-in users.
 - Anonymous detection requests do not save account history.
 - Raw video is not stored in Supabase.
-- Feedback/report submissions are persisted as user-initiated reports when Supabase persistence is enabled.
+- Internal detection feedback storage is not part of v1. The result screen links
+  users to an external report channel instead of saving feedback rows.
 - Solo game score rows are persisted in `public.game_sessions` when a signed-in
   user completes a Solo game and the backend has Supabase persistence enabled.
 - `public.insights_game_summary` is a service-role-readable aggregate view over
@@ -750,7 +716,7 @@ Recommended storage split:
 
 - Hugging Face Dataset stores approved research videos, manifests,
   predictions, evaluation metrics, and the dataset card.
-- Supabase stores app metadata, user-owned history, feedback, game scores,
+- Supabase stores app metadata, user-owned history, game scores,
   aggregate insights, and optional research indexes.
 
 Future backend-only settings:

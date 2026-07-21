@@ -36,7 +36,6 @@ from app.persistence import (
     get_detection_history,
     get_public_insights,
     is_supabase_persistence_enabled,
-    persist_detection_feedback,
     persist_detection_result,
     persist_game_score,
 )
@@ -87,12 +86,6 @@ if WEB_ASSETS_DIR.exists():
 
 DetectionSourceType = Literal["url", "upload", "share"]
 DetectionLabel = Literal["real", "partially_real", "partially_fake", "fake"]
-DetectionFeedbackType = Literal[
-    "false_positive",
-    "false_negative",
-    "unclear_result",
-    "other",
-]
 GameMode = Literal["solo"]
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
@@ -109,11 +102,6 @@ class DetectionCreateRequest(ApiModel):
     source_type: DetectionSourceType = Field(alias="sourceType")
     trim_start_sec: float | None = Field(default=None, alias="trimStartSec")
     trim_end_sec: float | None = Field(default=None, alias="trimEndSec")
-
-
-class DetectionFeedbackRequest(ApiModel):
-    feedback_type: DetectionFeedbackType = Field(alias="feedbackType")
-    comment: str = ""
 
 
 class GameScoreRequest(ApiModel):
@@ -155,22 +143,12 @@ class DetectionJob:
     error_message: str | None = None
 
 
-@dataclass
-class DetectionFeedback:
-    detection_id: str
-    created_at: float
-    feedback_type: DetectionFeedbackType
-    comment: str
-    user_id: str | None = None
-
-
 detection_jobs: dict[str, DetectionJob] = {}
 detection_jobs_by_idempotency_key: dict[str, str] = {}
 detection_thumbnail_strips: dict[str, Path] = {}
 detection_playback_segments: dict[str, tuple[Path, float]] = {}
 detection_window_clips: dict[tuple[str, int, int], Path] = {}
 detection_window_clip_preparing: set[tuple[str, int, int]] = set()
-detection_feedback: list[DetectionFeedback] = []
 detection_jobs_lock = Lock()
 detection_executor = ThreadPoolExecutor(
     max_workers=int(os.getenv("DETECTION_WORKERS", "1")),
@@ -941,34 +919,6 @@ def get_detection_window_clip_readiness(
     }
 
 
-@app.post("/api/detections/{detection_id}/feedback")
-def submit_detection_feedback(
-    detection_id: str,
-    request: DetectionFeedbackRequest,
-    http_request: Request,
-) -> dict[str, bool]:
-    feedback = DetectionFeedback(
-        detection_id=detection_id,
-        created_at=time.monotonic(),
-        feedback_type=request.feedback_type,
-        comment=request.comment.strip()[:1000],
-        user_id=resolve_authenticated_user_id(http_request),
-    )
-
-    with detection_jobs_lock:
-        if detection_id not in detection_jobs:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Result was not found.",
-            )
-
-        detection_feedback.append(feedback)
-
-    persist_detection_feedback_safely(feedback)
-
-    return {"ok": True}
-
-
 @app.get("/api/history")
 def get_history(http_request: Request) -> dict[str, object]:
     if not is_supabase_persistence_enabled():
@@ -1273,20 +1223,6 @@ def persist_detection_result_safely(
     except Exception:
         logger.exception(
             "Unexpected optional Supabase persistence failure for detection metadata",
-        )
-
-
-def persist_detection_feedback_safely(feedback: DetectionFeedback) -> None:
-    try:
-        persist_detection_feedback(
-            detection_id=feedback.detection_id,
-            user_id=feedback.user_id,
-            feedback_type=feedback.feedback_type,
-            comment=feedback.comment,
-        )
-    except Exception:
-        logger.exception(
-            "Unexpected optional Supabase persistence failure for detection feedback",
         )
 
 

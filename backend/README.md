@@ -139,7 +139,8 @@ curl http://127.0.0.1:8000/api/hugging-face/view-api
 ## Optional Supabase Persistence
 
 Supabase is optional during local development. Without these values, detection
-and feedback still work with in-memory state.
+still works with in-memory state, but signed-in history and score persistence
+are disabled.
 
 Apply the SQL in `../supabase/migrations/202606290001_detection_persistence.sql`
 and `../supabase/migrations/202607060001_game_score_persistence.sql` in the
@@ -197,7 +198,7 @@ The research/evaluation dataset plan lives in
 
 - Hugging Face Dataset for raw/trimmed research videos, manifests,
   predictions, dataset card, and metrics.
-- Supabase for app metadata, authenticated history, feedback, game scores,
+- Supabase for app metadata, authenticated history, game scores,
   aggregate insights, and optional research sample indexes.
 
 Reserved future backend-only env names:

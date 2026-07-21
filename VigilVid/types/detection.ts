@@ -6,12 +6,6 @@ export type DetectionLabel =
   | "partially_fake"
   | "fake";
 
-export type DetectionFeedbackType =
-  | "false_positive"
-  | "false_negative"
-  | "unclear_result"
-  | "other";
-
 export type DetectionSourceType = "url" | "upload" | "share";
 
 export type DetectionWindow = {
@@ -63,15 +57,6 @@ export type DetectionCreateRequest =
 export type DetectionCreateResponse = {
   detectionId: string;
   status: "queued";
-};
-
-export type DetectionFeedbackRequest = {
-  feedbackType: DetectionFeedbackType;
-  comment: string;
-};
-
-export type DetectionFeedbackResponse = {
-  ok: true;
 };
 
 export type DetectionHistoryItem = {

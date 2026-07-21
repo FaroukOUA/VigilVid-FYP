@@ -6,7 +6,7 @@ Use a hybrid research setup:
 
 - Hugging Face Dataset: canonical research dataset, video files, dataset card,
   labels, and versioned evaluation manifests.
-- Supabase: app metadata, authenticated history, feedback, game scores,
+- Supabase: app metadata, authenticated history, game scores,
   aggregate insights, and optional indexed research metadata.
 
 Do not use Supabase as the primary raw-video dataset store. It is useful for
@@ -85,7 +85,6 @@ checked.
 Store:
 
 - signed-in detection history metadata
-- feedback reports
 - game sessions and leaderboard rows
 - aggregate insight rows
 - optional research sample index pointing to Hugging Face paths
@@ -267,7 +266,7 @@ The core seed-42 export exists, so the next work is reporting and validation:
 3. Include the confusion matrix and class-level precision/recall/F1 in Chapter 5.
 4. Keep `research/output/game-video-audit.json` as evidence that the game videos
    decode locally.
-5. Use Supabase only for user/app metadata such as history, feedback, and
+5. Use Supabase only for user/app metadata such as history and
    `game_sessions`; do not move the raw video dataset into Supabase.
 6. If future users contribute videos, create a separate private Hugging Face
    Dataset unless the consent text explicitly allows public release.

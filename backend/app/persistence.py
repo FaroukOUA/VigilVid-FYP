@@ -78,30 +78,6 @@ def persist_detection_result(
     return True
 
 
-def persist_detection_feedback(
-    *,
-    detection_id: str,
-    user_id: str | None,
-    feedback_type: str,
-    comment: str,
-) -> bool:
-    if not is_supabase_persistence_enabled():
-        return False
-
-    response = post_supabase_rows(
-        "detection_feedback",
-        {
-            "detection_id": detection_id,
-            "user_id": user_id,
-            "feedback_type": feedback_type,
-            "comment": comment,
-            "allow_research_use": False,
-        },
-        prefer="return=minimal",
-    )
-    return response is not None
-
-
 def persist_game_score(
     *,
     user_id: str,

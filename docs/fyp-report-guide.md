@@ -178,7 +178,7 @@ Suggested sections:
 - 4.4 Database Design
   - detection history tables
   - detection windows
-  - detection feedback
+  - external report link
   - game sessions
   - insights summary views
 - 4.5 Dataset Design

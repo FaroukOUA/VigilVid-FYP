@@ -91,7 +91,7 @@ The backend is responsible for:
 - Reading the local unzipped game/evaluation export when available.
 - Returning sanitized game clip metadata and proxying game clip playback.
 - Transcoding proxied game clips for Android-safe playback.
-- Saving history, feedback, and game scores when configured.
+- Saving history and game scores when configured.
 
 Backend secrets stay server-side only.
 
@@ -143,7 +143,6 @@ Current Supabase responsibilities:
 
 - user accounts and sessions
 - signed-in detection history
-- feedback reports
 - game score persistence
 - future aggregate insight views
 

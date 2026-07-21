@@ -224,7 +224,7 @@ Insights must not expose personally identifiable information.
 Current implementation note:
 
 - Mobile Insights are intentionally deferred until enough aggregate rows exist
-  from saved detection summaries, feedback, and game data.
+  from saved detection summaries and game data.
 - The public website `stats.html` page is labeled as Insights and shows only
   aggregate values or an honest empty/sample state.
 

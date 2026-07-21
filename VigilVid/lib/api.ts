@@ -1,8 +1,6 @@
 import type {
   DetectionCreateRequest,
   DetectionCreateResponse,
-  DetectionFeedbackRequest,
-  DetectionFeedbackResponse,
   DetectionHistoryResponse,
   DetectionState,
   DetectionUploadCreateRequest,
@@ -175,26 +173,6 @@ export async function getDetection(
   return fetchJson<DetectionState>(
     `/api/detections/${encodeURIComponent(detectionId)}`,
     { signal },
-  );
-}
-
-export async function submitDetectionFeedback(
-  detectionId: string,
-  request: DetectionFeedbackRequest,
-  signal?: AbortSignal,
-  accessToken?: string,
-) {
-  return fetchJson<DetectionFeedbackResponse>(
-    `/api/detections/${encodeURIComponent(detectionId)}/feedback`,
-    {
-      body: JSON.stringify(request),
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeaders(accessToken),
-      },
-      method: "POST",
-      signal,
-    },
   );
 }
 
