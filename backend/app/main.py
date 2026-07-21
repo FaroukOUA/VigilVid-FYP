@@ -179,6 +179,7 @@ playback_executor = ThreadPoolExecutor(
     max_workers=int(os.getenv("PLAYBACK_WORKERS", "1")),
 )
 RESULT_PLAYBACK_TTL_SEC = int(os.getenv("RESULT_PLAYBACK_TTL_SEC", str(45 * 60)))
+MAX_PREWARM_WINDOW_CLIPS = int(os.getenv("MAX_PREWARM_WINDOW_CLIPS", "3"))
 
 
 @app.get("/health")
@@ -1448,6 +1449,7 @@ def prewarm_detection_window_clips(
     if not isinstance(windows, list):
         return
 
+    candidates: list[tuple[float, float, float]] = []
     for window in windows:
         if not isinstance(window, dict):
             continue
@@ -1457,6 +1459,12 @@ def prewarm_detection_window_clips(
         if start_sec is None or end_sec is None:
             continue
 
+        fake_probability = to_optional_float(window.get("fakeProbability")) or 0.0
+        candidates.append((start_sec, end_sec, fake_probability))
+
+    candidates.sort(key=lambda candidate: candidate[2], reverse=True)
+
+    for start_sec, end_sec, _fake_probability in candidates[:MAX_PREWARM_WINDOW_CLIPS]:
         try:
             get_detection_window_clip_state(
                 detection_id=detection_id,

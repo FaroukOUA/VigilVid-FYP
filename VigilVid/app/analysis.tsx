@@ -35,7 +35,6 @@ import {
   createDetection,
   getDetection,
   getDetectionWindowClipStatus,
-  getVideoPreviewWindowClipUrl,
 } from "../lib/api";
 import { detectRoute } from "../lib/routes";
 import { useAuth } from "../hooks/use-auth";
@@ -479,7 +478,6 @@ function WindowPreviewModal({
   detectionId,
   fallbackVideoUri,
   onClose,
-  previewId,
   selectedWindow,
   trimStartSec,
   videoAspectRatio,
@@ -487,7 +485,6 @@ function WindowPreviewModal({
   detectionId: string;
   fallbackVideoUri: string;
   onClose: () => void;
-  previewId: string;
   selectedWindow: DetectionWindow | null;
   trimStartSec: number;
   videoAspectRatio: number;
@@ -578,13 +575,9 @@ function WindowPreviewModal({
     screenHeight: windowDimensions.height,
     screenWidth: windowDimensions.width,
   });
-  const previewClipUri = previewId
-    ? getVideoPreviewWindowClipUrl(previewId, sourceStartSec, sourceEndSec)
-    : "";
-  const shouldUseFallback = !detectionId || clipStatus === "failed";
-  const videoUri =
-    clipUri || (shouldUseFallback ? previewClipUri || fallbackVideoUri : "");
-  const usesExactClip = Boolean(clipUri || previewClipUri);
+  const shouldUseLocalFallback = clipStatus === "failed" && Boolean(fallbackVideoUri);
+  const videoUri = clipUri || (shouldUseLocalFallback ? fallbackVideoUri : "");
+  const usesExactClip = Boolean(clipUri);
   const playbackStartSec = usesExactClip ? 0 : sourceStartSec;
   const playbackEndSec = usesExactClip ? windowDurationSec : sourceEndSec;
 
@@ -1136,7 +1129,6 @@ export default function AnalysisScreen() {
         detectionId={result?.detectionId ?? ""}
         fallbackVideoUri={fallbackVideoUri}
         onClose={() => setSelectedWindow(null)}
-        previewId={source.previewId}
         selectedWindow={selectedWindow}
         trimStartSec={source.trimStartSec ?? 0}
         videoAspectRatio={videoAspectRatio}

@@ -125,10 +125,9 @@ Current implementation note:
 - The analysis-window timeline can render a placeholder strip when no video thumbnails are available.
 - URL preview detections can return a real backend-generated thumbnail strip with a continuous probability overlay from green through amber to red.
 - Local upload detections can return a backend-generated thumbnail strip when the upload is trimmed before analysis. Otherwise the result timeline may use the placeholder strip.
-- Result windows are tappable. The popup uses the already prepared preview video
-  or selected local video, seeks to the selected model window, and stops at the
-  window end. This keeps Android playback immediate and avoids waiting for a
-  separate backend mini-clip.
+- Result windows are tappable. The popup prefers the backend's prepared
+  Android-safe result-window MP4. For local files, the app can fall back to the
+  selected phone video only if the prepared result-window clip is unavailable.
 
 ## Account Flow
 

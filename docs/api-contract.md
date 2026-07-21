@@ -173,9 +173,8 @@ Rules:
 ## GET `/api/detections/{detectionId}/window-clip`
 
 Returns readiness for one result-window MP4 and starts background preparation if
-the clip is not ready yet. This endpoint is available for future optimized
-window playback. The current mobile app uses the already prepared preview video
-or selected local video for immediate result-window playback.
+the clip is not ready yet. The mobile result popup calls this endpoint before
+loading a window clip so the video player does not block on FFmpeg work.
 
 Query:
 
@@ -210,7 +209,9 @@ Rules:
   expired.
 - This endpoint returns quickly. It must not block while a video player waits
   for ffmpeg.
-- The backend also prewarms result-window clips after detection completion.
+- The backend also prewarms a small number of high-signal result-window clips
+  after detection completion. It must not queue every window and block user
+  requested clips behind unnecessary work.
 
 ## GET `/api/detections/{detectionId}/window-clip.mp4`
 
