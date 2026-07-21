@@ -124,6 +124,9 @@ Rules:
 
 - Supports direct video URLs first, then the configured server-side downloader API.
 - Uses `SAVER_API_KEY` on the backend only. The Expo app must never receive this key.
+- Normalizes submitted social/share URLs before downloader use. For example,
+  Instagram `igsh`, common `utm_*`, and similar tracking query parameters are
+  removed while signed direct-video parameters are preserved.
 - Requires backend FFmpeg support for metadata, thumbnails, and trimming. The
   backend can use packaged FFmpeg when system tools are unavailable.
 - URL source videos may be longer than 2 minutes for preview, but analysis must use a selected segment of 2 minutes or less.

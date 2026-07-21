@@ -119,7 +119,7 @@ export default function PrepareScreen() {
   const canSubmit =
     validation.canAnalyze &&
     !isAuthLoading &&
-    (!isUrlBacked || urlPreviewStatus !== "loading") &&
+    (!isUrlBacked || urlPreviewStatus === "ready") &&
     (!isFileBacked || filePreviewStatus !== "loading");
 
   useEffect(() => {

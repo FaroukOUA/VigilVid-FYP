@@ -11,7 +11,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlencode, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
@@ -22,6 +22,33 @@ DIRECT_DOWNLOAD_TIMEOUT_SEC = 75.0
 LOOKUP_TIMEOUT_SEC = 20.0
 PREVIEW_TTL_SEC = 30 * 60
 THUMBNAIL_FRAME_COUNT = 8
+TRACKING_QUERY_KEYS = {
+    "fbclid",
+    "feature",
+    "gclid",
+    "igsh",
+    "igshid",
+    "mibextid",
+    "ref",
+    "s",
+    "share_id",
+    "si",
+    "spm",
+    "utm_campaign",
+    "utm_content",
+    "utm_medium",
+    "utm_source",
+    "utm_term",
+}
+INSTAGRAM_HOSTS = {"instagram.com", "www.instagram.com", "m.instagram.com"}
+TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com"}
+YOUTUBE_HOSTS = {
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+}
+YOUTUBE_SHORT_HOSTS = {"youtu.be", "www.youtu.be"}
 PHONE_SAFE_VIDEO_FILTER = (
     "scale=w='min(1280,iw)':h='min(1280,ih)':"
     "force_original_aspect_ratio=decrease:force_divisible_by=2,"
@@ -93,14 +120,18 @@ video_preview_clips: dict[tuple[str, int, int], Path] = {}
 
 def create_url_video_preview(*, url: str, source_type: str) -> VideoPreview:
     cleanup_expired_video_previews()
-    validate_http_url(url)
+    normalized_url = normalize_submitted_video_url(url)
+    validate_http_url(normalized_url)
 
     preview_id = f"src_{uuid.uuid4().hex[:12]}"
     file_path: Path | None = None
     thumbnail_strip_path: Path | None = None
 
     try:
-        file_path, content_type = download_url_to_temp_file(url, preview_id)
+        file_path, content_type = download_url_to_temp_file(
+            normalized_url,
+            preview_id,
+        )
         metadata = probe_video_metadata(file_path)
         file_size_bytes = file_path.stat().st_size
         thumbnail_strip_path = generate_thumbnail_strip(
@@ -115,7 +146,7 @@ def create_url_video_preview(*, url: str, source_type: str) -> VideoPreview:
         preview = VideoPreview(
             preview_id=preview_id,
             source_type=source_type,
-            original_url=url,
+            original_url=normalized_url,
             file_path=file_path,
             file_size_bytes=file_size_bytes,
             content_type=content_type,
@@ -133,6 +164,109 @@ def create_url_video_preview(*, url: str, source_type: str) -> VideoPreview:
         if thumbnail_strip_path is not None:
             cleanup_file(thumbnail_strip_path)
         raise
+
+
+def normalize_submitted_video_url(url: str) -> str:
+    trimmed_url = url.strip()
+    parsed_url = urlparse(trimmed_url)
+    host = parsed_url.netloc.lower()
+    host_without_port = host.split("@")[-1].split(":")[0]
+    path = parsed_url.path or ""
+
+    if host_without_port in INSTAGRAM_HOSTS:
+        return urlunparse(
+            (
+                parsed_url.scheme,
+                parsed_url.netloc,
+                normalize_social_path(path),
+                "",
+                "",
+                "",
+            ),
+        )
+
+    if host_without_port in TIKTOK_HOSTS:
+        return urlunparse(
+            (
+                parsed_url.scheme,
+                parsed_url.netloc,
+                normalize_social_path(path),
+                "",
+                "",
+                "",
+            ),
+        )
+
+    if host_without_port in YOUTUBE_SHORT_HOSTS:
+        return urlunparse(
+            (
+                parsed_url.scheme,
+                parsed_url.netloc,
+                normalize_social_path(path),
+                "",
+                "",
+                "",
+            ),
+        )
+
+    if host_without_port in YOUTUBE_HOSTS:
+        return normalize_youtube_url(parsed_url)
+
+    return strip_tracking_query_params(parsed_url)
+
+
+def normalize_social_path(path: str) -> str:
+    return path if path.endswith("/") else f"{path}/"
+
+
+def normalize_youtube_url(parsed_url) -> str:
+    query_pairs = parse_qsl(parsed_url.query, keep_blank_values=True)
+    kept_pairs = [
+        (key, value)
+        for key, value in query_pairs
+        if key == "v" or key.lower() not in TRACKING_QUERY_KEYS
+    ]
+
+    if parsed_url.path == "/watch":
+        kept_pairs = [(key, value) for key, value in kept_pairs if key == "v"]
+
+    normalized_path = (
+        normalize_social_path(parsed_url.path)
+        if parsed_url.path.startswith("/shorts/")
+        else parsed_url.path
+    )
+
+    return urlunparse(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            normalized_path,
+            "",
+            urlencode(kept_pairs),
+            "",
+        ),
+    )
+
+
+def strip_tracking_query_params(parsed_url) -> str:
+    query_pairs = parse_qsl(parsed_url.query, keep_blank_values=True)
+    kept_pairs = [
+        (key, value)
+        for key, value in query_pairs
+        if key.lower() not in TRACKING_QUERY_KEYS
+        and not key.lower().startswith("utm_")
+    ]
+
+    return urlunparse(
+        (
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            "",
+            urlencode(kept_pairs),
+            "",
+        ),
+    )
 
 
 def create_uploaded_video_preview(

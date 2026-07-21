@@ -2,7 +2,7 @@
   "expo": {
     "name": "VigilVid",
     "slug": "VigilVid",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vigilvid",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.vigilvid.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#0E7C73",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

@@ -52,6 +52,7 @@ from app.video_preview import (
     get_video_preview_window_clip,
     generate_thumbnail_strip,
     get_video_preview_thumbnail_path,
+    normalize_submitted_video_url,
     normalize_clip_range,
     normalize_trim_range,
     probe_video_metadata,
@@ -497,13 +498,14 @@ async def build_detection_job(
             get_public_base_url(http_request),
         )
 
-    validate_url_detection_request(request)
+    normalized_url = normalize_submitted_video_url(request.url or "")
+    validate_url_detection_url(normalized_url)
     return DetectionJob(
         detection_id=detection_id,
         created_at=time.monotonic(),
         source_type=request.source_type,
         user_id=user_id,
-        url=request.url,
+        url=normalized_url,
     )
 
 
@@ -597,14 +599,14 @@ async def parse_json_detection_request(http_request: Request) -> DetectionCreate
     return request
 
 
-def validate_url_detection_request(request: DetectionCreateRequest) -> None:
-    if not request.url:
+def validate_url_detection_url(url: str) -> None:
+    if not url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Paste a video link.",
         )
 
-    parsed_url = urlparse(request.url)
+    parsed_url = urlparse(url)
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
